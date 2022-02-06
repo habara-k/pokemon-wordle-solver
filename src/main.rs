@@ -1,5 +1,6 @@
 use wordle_pokemon::consts::*;
 use std::collections::BTreeMap;
+use std::time::Instant;
 use ord_subset::{OrdSubsetIterExt,OrdSubsetSliceExt};
 
 #[derive(Clone,Copy)]
@@ -246,9 +247,16 @@ impl Solver {
 
 
 fn main() {
+    let start = Instant::now();
+
     let mut solver = Solver::new();
     solver.build_best_solution();
     println!("best.len(): {:?}", solver.best.len());
     println!("memo.len(): {:?}", solver.memo.len());
     println!("lb_memo.len(): {:?}", solver.lb_memo.len());
+
+    println!(
+        "elapsed time: {:?} [sec]",
+        start.elapsed().as_nanos() as f64 / 1_000_000_000 as f64
+    );
 }
