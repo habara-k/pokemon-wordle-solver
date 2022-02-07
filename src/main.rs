@@ -16,8 +16,7 @@ const ALL_CORRECT: usize = ((Status::Correct as usize) << 2*0) +
                            ((Status::Correct as usize) << 2*3) +
                            ((Status::Correct as usize) << 2*4);
 
-const INFTY: f64 = 1e10;
-const EPS: f64 = 1e-10;
+const INFTY: i32 = i32::MAX / 2;
 
 use argh::FromArgs;
 
@@ -43,9 +42,9 @@ struct Solver {
     lb_depth_limit: usize,
 
     judge_table: Vec<Vec<usize>>,
-    memo: BTreeMap<SetId, (f64, usize, BTreeMap<usize, Vec<usize>>)>,
-    best: BTreeMap<SetId, f64>,
-    lb_memo: BTreeMap<SetId, (usize, f64)>,
+    memo: BTreeMap<SetId, (i32, usize, BTreeMap<usize, Vec<usize>>)>,
+    best: BTreeMap<SetId, i32>,
+    lb_memo: BTreeMap<SetId, (usize, i32)>,
 
     set_id: BTreeMap<Vec<usize>,SetId>,
     cnt: usize,
@@ -119,21 +118,20 @@ impl Solver {
 
     pub fn build_good_solution(&mut self) {
         let all = (0..self.n).collect();
-        println!("期待回数(貪欲): {:?}", self.dfs_good_solution(&all));
+        println!("期待回数(貪欲): {:?}", self.dfs_good_solution(&all) as f64 / self.n as f64);
+        println!("{:?}", self.dfs_good_solution(&all));
     }
 
-    fn dfs_good_solution(&mut self, rem: &Vec<usize>) -> f64 {
-        //println!("dfs_good_solution: rem: {:?}", &rem);
-
+    fn dfs_good_solution(&mut self, rem: &Vec<usize>) -> i32 {
         assert!(rem.len() > 0);
         if rem.len() == 1 {
-            return 1.0;
+            return 1;
         }
 
         let rem_id = self.get_set_id(rem);
 
-        if self.memo.contains_key(&rem_id) {
-            return self.memo[&rem_id].0;
+        if let Some((val, ..)) = self.memo.get(&rem_id) {
+            return *val;
         }
 
         let partitions: Vec<BTreeMap<usize,Vec<usize>>> = (0..self.n).map(|guess| {
@@ -158,17 +156,17 @@ impl Solver {
             partitions[*guess].values().map(|s| (s.len() as f64 + (s.len() as f64).log2()) * s.len() as f64).sum()
         }).unwrap();
 
-        let val: f64 = 1.0 + partitions[good_guess].values().map(|s| self.dfs_good_solution(s) * s.len() as f64).sum::<f64>() / rem.len() as f64;
+        let val: i32 = rem.len() as i32 + partitions[good_guess].values().map(|s| self.dfs_good_solution(s)).sum::<i32>();
 
         self.memo.insert(rem_id, (val, good_guess, partitions[good_guess].clone()));
 
         val
     }
 
-    fn lower_bound(&mut self, rem: &Vec<usize>, depth: usize) -> f64 {
+    fn lower_bound(&mut self, rem: &Vec<usize>, depth: usize) -> i32 {
         assert!(rem.len() > 0);
         if depth == 0 || rem.len() <= 2 {
-            return 2.0 - 1.0 / rem.len() as f64;
+            return 2 * rem.len() as i32 - 1;
         }
 
         let rem_id = self.get_set_id(rem);
@@ -183,13 +181,13 @@ impl Solver {
             self.partition(rem, &guess)
         }).collect();
 
-        let ret: f64 = 1.0 + partitions.iter().map(|part| {
+        let ret: i32 = rem.len() as i32 + partitions.iter().map(|part| {
             part.values().map(|s| {
-                self.lower_bound(s, depth-1) * s.len() as f64
-            }).sum::<f64>()
-        }).ord_subset_min().unwrap() / rem.len() as f64;
+                self.lower_bound(s, depth-1)
+            }).sum::<i32>()
+        }).ord_subset_min().unwrap();
 
-        assert!(ret + EPS > 2.0 - 1.0 / rem.len() as f64);
+        assert!(ret >= 2 * rem.len() as i32 - 1);
 
         self.lb_memo.insert(rem_id, (depth, ret));
         ret
@@ -197,34 +195,36 @@ impl Solver {
 
     pub fn build_best_solution(&mut self) {
         let all = (0..self.n).collect();
-        println!("期待回数(最適): {:?}", self.dfs_best_solution(&all, INFTY));
+        println!("期待回数(最適): {:?}", self.dfs_best_solution(&all, INFTY) as f64 / self.n as f64);
+        println!("{:?}", self.dfs_best_solution(&all, INFTY));
     }
 
-    fn dfs_best_solution(&mut self, rem: &Vec<usize>, ub: f64) -> f64 {
+    fn dfs_best_solution(&mut self, rem: &Vec<usize>, ub: i32) -> i32 {
         assert!(rem.len() > 0);
         if rem.len() == 1 {
-            return 1.0;
+            return 1;
         }
 
         let rem_id = self.get_set_id(rem);
-        //println!("dfs_best_solution: rem: {:?}", &rem);
 
         if let Some(val) = self.best.get(&rem_id) {
             return *val;
         }
 
-        let mut val = self.dfs_good_solution(rem);
-        //let mut val = self.dfs_good_solution(rem, self.good_depth_limit);
-
-        if self.lower_bound(rem, self.lb_depth_limit) + EPS > ub {
+        if self.lower_bound(rem, self.lb_depth_limit) >= ub {
             return INFTY;
         }
+
+        let mut val = self.dfs_good_solution(rem);
 
         let partitions: Vec<BTreeMap<usize,Vec<usize>>> = (0..self.n).map(|guess| {
             self.partition(rem, &guess)
         }).collect();
 
         let penalty: Vec<f64> = partitions.iter().map(|part| {
+            // minimize "average size - entropy"
+            //part.values().map(|s| (s.len() as f64 + (s.len() as f64).log2()) * s.len() as f64).sum::<f64>()
+            // maximize "entropy"
             part.values().map(|s| (s.len() as f64).log2() * s.len() as f64).sum::<f64>()
         }).collect();
 
@@ -235,24 +235,23 @@ impl Solver {
         for guess in order.iter() {
             let part = &partitions[*guess];
 
-            let lb: f64 = 1.0 + part.values().map(|s| {
-                self.lower_bound(s, self.lb_depth_limit) * s.len() as f64
-            }).sum::<f64>() / rem.len() as f64;
+            let lb: i32 = rem.len() as i32 + part.values().map(|s| {
+                self.lower_bound(s, self.lb_depth_limit)
+            }).sum::<i32>();
 
-            if lb + EPS > val {
+            if lb >= val {
                 continue
             }
 
-            let mut tmp: f64 = 1.0;
+            let mut tmp: i32 = rem.len() as i32;
             for s in part.values() {
-                tmp += self.dfs_best_solution(s, (val - tmp) * rem.len() as f64 / s.len() as f64)
-                        * s.len() as f64 / rem.len() as f64;
-                if tmp + EPS > val {
+                tmp += self.dfs_best_solution(s, val - tmp);
+                if tmp >= val {
                     break;
                 }
             }
 
-            if tmp < val + EPS {
+            if tmp < val {
                 val = tmp;
                 self.memo.insert(rem_id.clone(), (val, *guess, part.clone()));
             }
