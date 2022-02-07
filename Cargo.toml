@@ -9,3 +9,4 @@ edition = "2018"
 [dependencies]
 argh = "0.1.6"
 ord_subset = "3"
+rayon = "1.5"

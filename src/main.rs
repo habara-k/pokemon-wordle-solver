@@ -3,7 +3,9 @@ use std::collections::BTreeMap;
 use std::time::Instant;
 use std::fs;
 use std::io::Write;
+use std::sync::Mutex;
 use ord_subset::{OrdSubsetIterExt,OrdSubsetSliceExt};
+use rayon::prelude::*;
 
 #[derive(Clone,Copy)]
 enum Status {
@@ -26,12 +28,16 @@ use argh::FromArgs;
 /// arguments
 struct Args {
     /// the number of pokemons
-    #[argh(option)]
-    n: usize,
+    #[argh(option, short='n')]
+    num_pokemons: usize,
     /// the limit depth of lower_bound dfs
-    #[argh(option)]
+    #[argh(option, default="default_lb_depth_limit()")]
     lb_depth_limit: usize,
+    /// whether parallel
+    #[argh(switch, short='p')]
+    parallel: bool,
 }
+fn default_lb_depth_limit() -> usize { 1 }
 
 
 #[derive(PartialEq,Eq,PartialOrd,Ord,Clone,Copy)]
@@ -56,11 +62,11 @@ impl Solver {
     pub fn new() -> Self {
         let args: Args = argh::from_env();
 
-        let n = args.n;
+        let n = args.num_pokemons;
         let lb_depth_limit = args.lb_depth_limit;
 
-        let judge_table = (0..args.n).map(|guess| {
-            (0..args.n).map(|ans| {
+        let judge_table = (0..n).map(|guess| {
+            (0..n).map(|ans| {
                 Self::judge(guess, ans)
             }).collect()
         }).collect();
@@ -187,7 +193,7 @@ impl Solver {
             part.values().map(|s| {
                 self.lower_bound(s, depth-1)
             }).sum::<i32>()
-        }).ord_subset_min().unwrap();
+        }).min().unwrap();
 
         assert!(ret >= 2 * rem.len() as i32 - 1);
 
@@ -298,7 +304,67 @@ impl Solver {
 }
 
 
+fn parallel() {
+    let start = Instant::now();
+
+    let args: Args = argh::from_env();
+
+    let mut solver = Solver::new();
+    let val = Mutex::new(solver.dfs_good_solution(&(0..args.num_pokemons).collect()));
+
+    let success = Mutex::new(0);
+    let failed = Mutex::new(0);
+
+    let optval = (0..args.num_pokemons).collect::<Vec<usize>>().par_iter().map(|first_guess| {
+        let mut solver = Solver::new();
+
+        let part = solver.partition(&(0..solver.n).collect(), first_guess);
+
+        let lb: i32 = solver.n as i32 + part.values().map(|s| {
+            solver.lower_bound(s, solver.lb_depth_limit)
+        }).sum::<i32>();
+
+        if lb >= *val.lock().unwrap() {
+            *success.lock().unwrap() += 1;
+            INFTY
+        } else {
+            *failed.lock().unwrap() += 1;
+            let mut tmp: i32 = solver.n as i32;
+            for s in part.values() {
+                tmp += solver.dfs_best_solution(s, *val.lock().unwrap() - tmp);
+                if tmp >= *val.lock().unwrap() {
+                    break;
+                }
+            }
+            if tmp < *val.lock().unwrap() {
+                *val.lock().unwrap() = tmp;
+                tmp
+            } else {
+                INFTY
+            }
+        }
+    }).min().unwrap();
+
+    println!("期待回数(最適): {:?}", optval as f64 / solver.n as f64);
+    println!("{:?}", optval);
+
+    println!("success: {:?}", *success.lock().unwrap());
+    println!("failed: {:?}", *failed.lock().unwrap());
+
+    println!(
+        "elapsed time: {:?} [sec]",
+        start.elapsed().as_nanos() as f64 / 1_000_000_000 as f64
+    );
+}
+
 fn main() {
+
+    let args: Args = argh::from_env();
+    if args.parallel {
+        parallel();
+        return;
+    }
+
     let start = Instant::now();
 
     let mut solver = Solver::new();
