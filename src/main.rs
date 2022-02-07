@@ -3,7 +3,6 @@ use std::collections::BTreeMap;
 use std::time::Instant;
 use std::fs;
 use std::io::Write;
-use std::sync::Mutex;
 use ord_subset::{OrdSubsetIterExt,OrdSubsetSliceExt};
 use rayon::prelude::*;
 
@@ -33,9 +32,6 @@ struct Args {
     /// the limit depth of lower_bound dfs
     #[argh(option, default="default_lb_depth_limit()")]
     lb_depth_limit: usize,
-    /// whether parallel
-    #[argh(switch, short='p')]
-    parallel: bool,
 }
 fn default_lb_depth_limit() -> usize { 1 }
 
@@ -47,6 +43,7 @@ struct SetId(usize);
 #[derive(Default)]
 struct Solver {
     n: usize,
+    all: Vec<usize>,
     lb_depth_limit: usize,
 
     judge_table: Vec<Vec<usize>>,
@@ -56,6 +53,8 @@ struct Solver {
 
     set_id: BTreeMap<Vec<usize>,SetId>,
     cnt: usize,
+
+    success: usize,
 }
 
 impl Solver {
@@ -63,15 +62,16 @@ impl Solver {
         let args: Args = argh::from_env();
 
         let n = args.num_pokemons;
+        let all = (0..n).collect::<Vec<usize>>();
         let lb_depth_limit = args.lb_depth_limit;
 
-        let judge_table = (0..n).map(|guess| {
-            (0..n).map(|ans| {
+        let judge_table = all.iter().map(|guess| {
+            all.iter().map(|ans| {
                 Self::judge(guess, ans)
             }).collect()
         }).collect();
 
-        Self { n, judge_table, lb_depth_limit, ..Default::default() }
+        Self { n, all, lb_depth_limit, judge_table, ..Default::default() }
     }
 
     fn get_set_id(&mut self, st: &Vec<usize>) -> SetId {
@@ -84,10 +84,10 @@ impl Solver {
         return id;
     }
 
-    fn judge(guess: usize, ans: usize) -> usize {
+    fn judge(guess: &usize, ans: &usize) -> usize {
         let (mut ret, mut guess_used, mut ans_used) = (0, 0, 0);
         for i in 0..5 {
-            if POKEMONS[guess][i] == POKEMONS[ans][i] {
+            if POKEMONS[*guess][i] == POKEMONS[*ans][i] {
                 ret |= (Status::Correct as usize) << 2*i;
                 guess_used |= 1 << i;
                 ans_used |= 1 << i;
@@ -102,7 +102,7 @@ impl Solver {
                 if (ans_used >> j & 1) > 0 {
                     continue;
                 }
-                if POKEMONS[guess][i] == POKEMONS[ans][j] {
+                if POKEMONS[*guess][i] == POKEMONS[*ans][j] {
                     ret |= (Status::Wrong as usize) << 2*i;
                     guess_used |= 1 << i;
                     ans_used |= 1 << j;
@@ -126,7 +126,7 @@ impl Solver {
 
     pub fn build_good_solution(&mut self) {
         let all = (0..self.n).collect();
-        println!("期待回数(貪欲): {:?}", self.dfs_good_solution(&all) as f64 / self.n as f64);
+        println!("期待回数(貪欲): {:?}", self.dfs_good_solution(&all) as f32 / self.n as f32);
         println!("{:?}", self.dfs_good_solution(&all));
     }
 
@@ -142,26 +142,30 @@ impl Solver {
             return *val;
         }
 
-        let partitions: Vec<BTreeMap<usize,Vec<usize>>> = (0..self.n).map(|guess| {
+        // parallel
+        let partitions: Vec<BTreeMap<usize,Vec<usize>>> = self.all.par_iter().map(|guess| {
             self.partition(rem, &guess)
-        }).collect();
+        }).collect::<Vec<_>>();
 
-        let good_guess = (0..self.n).ord_subset_min_by_key(|guess| -> f64 {
+        let good_guess = *self.all.iter().ord_subset_min_by_key(|&guess| -> f32 {
             // maximize entropy
             // n=511: 3.85127
-            //partitions[*guess].values().map(|s| (s.len() as f64).log2() * s.len() as f64).sum()
+            //partitions[*guess].values().map(|s| (s.len() as f32).log2() * s.len() as f32).sum()
 
             // minimize maximum size
             // n=511: 3.92944
-            //partitions[*guess].values().map(|s| s.len()).max().unwrap() as f64
+            //partitions[*guess].values().map(|s| s.len()).max().unwrap() as f32
 
             // minimize average size
             // n=511: 3.70646
-            //partitions[*guess].values().map(|s| s.len() as f64 * s.len() as f64).sum()
+            //partitions[*guess].values().map(|s| s.len() as f32 * s.len() as f32).sum()
 
             // minimize average size, mazimize entropy
             // n=511: 3.69080
-            partitions[*guess].values().map(|s| (s.len() as f64 + (s.len() as f64).log2()) * s.len() as f64).sum()
+            partitions[*guess].values().map(|s| {
+                let x = s.len() as f32;
+                (x + x.log2()) * x
+            }).sum()
         }).unwrap();
 
         let val: i32 = rem.len() as i32 + partitions[good_guess].values().map(|s| self.dfs_good_solution(s)).sum::<i32>();
@@ -181,19 +185,28 @@ impl Solver {
 
         if let Some((d, lb)) = self.lb_memo.get(&rem_id) {
             if *d >= depth {
+                self.success += 1;
                 return *lb
             }
         }
 
-        let partitions: Vec<BTreeMap<usize,Vec<usize>>> = (0..self.n).map(|guess| {
+        // parallel
+        let partitions: Vec<BTreeMap<usize,Vec<usize>>> = self.all.par_iter().map(|guess| {
             self.partition(rem, &guess)
-        }).collect();
+        }).collect::<Vec<_>>();
 
         let ret: i32 = rem.len() as i32 + partitions.iter().map(|part| {
             part.values().map(|s| {
                 self.lower_bound(s, depth-1)
             }).sum::<i32>()
         }).min().unwrap();
+
+
+        //let ret: i32 = self.all.par_iter().map(|guess| {
+        //    self.partition(rem, &guess).values().map(|s| {
+        //        self.lower_bound(s, depth-1)
+        //    }).sum::<i32>()
+        //}).min().unwrap();
 
         assert!(ret >= 2 * rem.len() as i32 - 1);
 
@@ -203,7 +216,7 @@ impl Solver {
 
     pub fn build_best_solution(&mut self) {
         let all = (0..self.n).collect();
-        println!("期待回数(最適): {:?}", self.dfs_best_solution(&all, INFTY) as f64 / self.n as f64);
+        println!("期待回数(最適): {:?}", self.dfs_best_solution(&all, INFTY) as f32 / self.n as f32);
         println!("{:?}", self.dfs_best_solution(&all, INFTY));
     }
 
@@ -225,7 +238,8 @@ impl Solver {
 
         let mut val = self.dfs_good_solution(rem);
 
-        let partitions: Vec<BTreeMap<usize,Vec<usize>>> = (0..self.n).map(|guess| {
+        // parallel
+        let partitions: Vec<BTreeMap<usize,Vec<usize>>> = self.all.par_iter().map(|guess| {
             self.partition(rem, &guess)
         }).collect();
 
@@ -239,8 +253,6 @@ impl Solver {
             // minimize "average size"
             //part.values().map(|s| s.len() as f64 * s.len() as f64).sum::<f64>()
         }).collect();
-
-
 
         let mut order: Vec<usize> = (0..self.n).collect();
         order.ord_subset_sort_by_key(|i| penalty[*i]);
@@ -267,7 +279,7 @@ impl Solver {
 
             if tmp < val {
                 val = tmp;
-                self.memo.insert(rem_id.clone(), (val, *guess, part.clone()));
+                self.memo.insert(rem_id, (val, *guess, part.clone()));
             }
         }
 
@@ -304,67 +316,7 @@ impl Solver {
 }
 
 
-fn parallel() {
-    let start = Instant::now();
-
-    let args: Args = argh::from_env();
-
-    let mut solver = Solver::new();
-    let val = Mutex::new(solver.dfs_good_solution(&(0..args.num_pokemons).collect()));
-
-    let success = Mutex::new(0);
-    let failed = Mutex::new(0);
-
-    let optval = (0..args.num_pokemons).collect::<Vec<usize>>().par_iter().map(|first_guess| {
-        let mut solver = Solver::new();
-
-        let part = solver.partition(&(0..solver.n).collect(), first_guess);
-
-        let lb: i32 = solver.n as i32 + part.values().map(|s| {
-            solver.lower_bound(s, solver.lb_depth_limit)
-        }).sum::<i32>();
-
-        if lb >= *val.lock().unwrap() {
-            *success.lock().unwrap() += 1;
-            INFTY
-        } else {
-            *failed.lock().unwrap() += 1;
-            let mut tmp: i32 = solver.n as i32;
-            for s in part.values() {
-                tmp += solver.dfs_best_solution(s, *val.lock().unwrap() - tmp);
-                if tmp >= *val.lock().unwrap() {
-                    break;
-                }
-            }
-            if tmp < *val.lock().unwrap() {
-                *val.lock().unwrap() = tmp;
-                tmp
-            } else {
-                INFTY
-            }
-        }
-    }).min().unwrap();
-
-    println!("期待回数(最適): {:?}", optval as f64 / solver.n as f64);
-    println!("{:?}", optval);
-
-    println!("success: {:?}", *success.lock().unwrap());
-    println!("failed: {:?}", *failed.lock().unwrap());
-
-    println!(
-        "elapsed time: {:?} [sec]",
-        start.elapsed().as_nanos() as f64 / 1_000_000_000 as f64
-    );
-}
-
 fn main() {
-
-    let args: Args = argh::from_env();
-    if args.parallel {
-        parallel();
-        return;
-    }
-
     let start = Instant::now();
 
     let mut solver = Solver::new();
@@ -372,22 +324,15 @@ fn main() {
     solver.build_best_solution();
     //solver.build_good_solution();
 
-    // 初手ジーランス
-    //let optval = solver.partition(&(0..solver.n).collect(), &196).values().map(|s| {
-    //    solver.dfs_best_solution(s, INFTY)
-    //}).sum::<i32>() + solver.n as i32;
-    //println!("first 196: {:?}", optval);
-    //println!("first 196: {:?}", optval as f64 / solver.n as f64);
-
-
     println!("best.len(): {:?}", solver.best.len());
     println!("memo.len(): {:?}", solver.memo.len());
     println!("lb_memo.len(): {:?}", solver.lb_memo.len());
+    println!("success: {:?}", solver.success);
 
     solver.write();
 
     println!(
         "elapsed time: {:?} [sec]",
-        start.elapsed().as_nanos() as f64 / 1_000_000_000 as f64
+        start.elapsed().as_nanos() as f32 / 1_000_000_000 as f32
     );
 }
