@@ -148,23 +148,11 @@ impl Solver {
         }).collect::<Vec<_>>();
 
         let good_guess = *self.all.iter().ord_subset_min_by_key(|&guess| -> f32 {
-            // maximize entropy
-            // n=511: 3.85127
-            //partitions[*guess].values().map(|s| (s.len() as f32).log2() * s.len() as f32).sum()
-
-            // minimize maximum size
-            // n=511: 3.92944
-            //partitions[*guess].values().map(|s| s.len()).max().unwrap() as f32
-
-            // minimize average size
-            // n=511: 3.70646
-            //partitions[*guess].values().map(|s| s.len() as f32 * s.len() as f32).sum()
-
             // minimize average size, mazimize entropy
-            // n=511: 3.69080
+            // n=511: 3.68688
             partitions[*guess].values().map(|s| {
                 let x = s.len() as f32;
-                (x + x.log2()) * x
+                (0.1*x + x.log2()) * x
             }).sum()
         }).unwrap();
 
@@ -201,13 +189,6 @@ impl Solver {
             }).sum::<i32>()
         }).min().unwrap();
 
-
-        //let ret: i32 = self.all.par_iter().map(|guess| {
-        //    self.partition(rem, &guess).values().map(|s| {
-        //        self.lower_bound(s, depth-1)
-        //    }).sum::<i32>()
-        //}).min().unwrap();
-
         assert!(ret >= 2 * rem.len() as i32 - 1);
 
         self.lb_memo.insert(rem_id, (depth, ret));
@@ -243,15 +224,12 @@ impl Solver {
             self.partition(rem, &guess)
         }).collect();
 
-        let penalty: Vec<f64> = partitions.iter().map(|part| {
-            // minimize "average size - entropy"
-            //part.values().map(|s| (s.len() as f64 + (s.len() as f64).log2()) * s.len() as f64).sum::<f64>()
-
+        let penalty: Vec<f32> = partitions.iter().map(|part| {
             // maximize "entropy"
-            part.values().map(|s| (s.len() as f64).log2() * s.len() as f64).sum::<f64>()
-
-            // minimize "average size"
-            //part.values().map(|s| s.len() as f64 * s.len() as f64).sum::<f64>()
+            part.values().map(|s| {
+                let x = s.len() as f32;
+                x.log2() * x
+            }).sum::<f32>()
         }).collect();
 
         let mut order: Vec<usize> = (0..self.n).collect();
