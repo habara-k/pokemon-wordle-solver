@@ -117,6 +117,11 @@ impl Solver {
         ret
     }
 
+    pub fn build_good_solution(&mut self) {
+        let all = (0..self.n).collect();
+        println!("期待回数(貪欲): {:?}", self.dfs_good_solution(&all));
+    }
+
     fn dfs_good_solution(&mut self, rem: &Vec<usize>) -> f64 {
         //println!("dfs_good_solution: rem: {:?}", &rem);
 
@@ -136,7 +141,21 @@ impl Solver {
         }).collect();
 
         let good_guess = (0..self.n).ord_subset_min_by_key(|guess| -> f64 {
-            partitions[*guess].values().map(|s| (s.len() as f64).log2() * s.len() as f64).sum()
+            // maximize entropy
+            // n=511: 3.85127
+            //partitions[*guess].values().map(|s| (s.len() as f64).log2() * s.len() as f64).sum()
+
+            // minimize maximum size
+            // n=511: 3.92944
+            //partitions[*guess].values().map(|s| s.len()).max().unwrap() as f64
+
+            // minimize average size
+            // n=511: 3.70646
+            //partitions[*guess].values().map(|s| s.len() as f64 * s.len() as f64).sum()
+
+            // minimize average size, mazimize entropy
+            // n=511: 3.69080
+            partitions[*guess].values().map(|s| (s.len() as f64 + (s.len() as f64).log2()) * s.len() as f64).sum()
         }).unwrap();
 
         let val: f64 = 1.0 + partitions[good_guess].values().map(|s| self.dfs_good_solution(s) * s.len() as f64).sum::<f64>() / rem.len() as f64;
@@ -251,6 +270,7 @@ fn main() {
 
     let mut solver = Solver::new();
     solver.build_best_solution();
+    //solver.build_good_solution();
     println!("best.len(): {:?}", solver.best.len());
     println!("memo.len(): {:?}", solver.memo.len());
     println!("lb_memo.len(): {:?}", solver.lb_memo.len());
