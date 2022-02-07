@@ -3,6 +3,7 @@ use std::collections::BTreeMap;
 use std::time::Instant;
 use std::fs;
 use std::io::Write;
+use std::sync::{Mutex,Arc};
 use ord_subset::{OrdSubsetIterExt,OrdSubsetSliceExt};
 use rayon::prelude::*;
 
@@ -39,6 +40,15 @@ fn default_lb_depth_limit() -> usize { 1 }
 #[derive(PartialEq,Eq,PartialOrd,Ord,Clone,Copy)]
 struct SetId(usize);
 
+#[derive(Default)]
+struct Cache {
+    memo: BTreeMap<SetId, (i32, usize, BTreeMap<usize, Vec<usize>>)>,
+    best: BTreeMap<SetId, i32>,
+    lb_memo: BTreeMap<SetId, (usize, i32)>,
+
+    set_id: BTreeMap<Vec<usize>,SetId>,
+    cnt: usize,
+}
 
 #[derive(Default)]
 struct Solver {
@@ -47,14 +57,15 @@ struct Solver {
     lb_depth_limit: usize,
 
     judge_table: Vec<Vec<usize>>,
-    memo: BTreeMap<SetId, (i32, usize, BTreeMap<usize, Vec<usize>>)>,
-    best: BTreeMap<SetId, i32>,
-    lb_memo: BTreeMap<SetId, (usize, i32)>,
+    cache: Arc<Mutex<Cache>>,
+    //memo: BTreeMap<SetId, (i32, usize, BTreeMap<usize, Vec<usize>>)>,
+    //best: BTreeMap<SetId, i32>,
+    //lb_memo: BTreeMap<SetId, (usize, i32)>,
 
-    set_id: BTreeMap<Vec<usize>,SetId>,
-    cnt: usize,
+    //set_id: BTreeMap<Vec<usize>,SetId>,
+    //cnt: usize,
 
-    success: usize,
+    //success: usize,
 }
 
 impl Solver {
@@ -72,16 +83,6 @@ impl Solver {
         }).collect();
 
         Self { n, all, lb_depth_limit, judge_table, ..Default::default() }
-    }
-
-    fn get_set_id(&mut self, st: &Vec<usize>) -> SetId {
-        if let Some(id) = self.set_id.get(st) {
-            return *id;
-        }
-        let id = SetId(self.cnt);
-        self.set_id.insert(st.clone(), id);
-        self.cnt += 1;
-        return id;
     }
 
     fn judge(guess: &usize, ans: &usize) -> usize {
@@ -112,6 +113,18 @@ impl Solver {
         ret
     }
 
+    fn get_set_id(&self, st: &Vec<usize>) -> SetId {
+        if let Some(id) = self.cache.lock().unwrap().set_id.get(st) {
+            return *id;
+        }
+        let mut cache = self.cache.lock().unwrap();
+        let id = SetId(cache.cnt);
+        cache.cnt += 1;
+        cache.set_id.insert(st.clone(), id);
+
+        return id;
+    }
+
     fn partition(&self, rem: &Vec<usize>, guess: &usize) -> BTreeMap<usize,Vec<usize>> {
         let mut ret: BTreeMap<usize,Vec<usize>> = BTreeMap::new();
         for ans in rem.iter() {
@@ -124,13 +137,13 @@ impl Solver {
         ret
     }
 
-    pub fn build_good_solution(&mut self) {
+    pub fn build_good_solution(&self) {
         let all = (0..self.n).collect();
         println!("期待回数(貪欲): {:?}", self.dfs_good_solution(&all) as f32 / self.n as f32);
         println!("{:?}", self.dfs_good_solution(&all));
     }
 
-    fn dfs_good_solution(&mut self, rem: &Vec<usize>) -> i32 {
+    fn dfs_good_solution(&self, rem: &Vec<usize>) -> i32 {
         assert!(rem.len() > 0);
         if rem.len() == 1 {
             return 1;
@@ -138,7 +151,7 @@ impl Solver {
 
         let rem_id = self.get_set_id(rem);
 
-        if let Some((val, ..)) = self.memo.get(&rem_id) {
+        if let Some((val, ..)) = self.cache.lock().unwrap().memo.get(&rem_id) {
             return *val;
         }
 
@@ -156,14 +169,18 @@ impl Solver {
             }).sum()
         }).unwrap();
 
-        let val: i32 = rem.len() as i32 + partitions[good_guess].values().map(|s| self.dfs_good_solution(s)).sum::<i32>();
+        // parallel
+        //let val = rem.len() as i32 + partitions[good_guess].par_iter().map(
+        //    |(_, s)| self.dfs_good_solution(s)).sum::<i32>();
+        let val = rem.len() as i32 + partitions[good_guess].iter().map(
+            |(_, s)| self.dfs_good_solution(s)).sum::<i32>();
 
-        self.memo.insert(rem_id, (val, good_guess, partitions[good_guess].clone()));
+        self.cache.lock().unwrap().memo.insert(rem_id, (val, good_guess, partitions[good_guess].clone()));
 
         val
     }
 
-    fn lower_bound(&mut self, rem: &Vec<usize>, depth: usize) -> i32 {
+    fn lower_bound(&self, rem: &Vec<usize>, depth: usize) -> i32 {
         assert!(rem.len() > 0);
         if depth == 0 || rem.len() <= 2 {
             return 2 * rem.len() as i32 - 1;
@@ -171,9 +188,9 @@ impl Solver {
 
         let rem_id = self.get_set_id(rem);
 
-        if let Some((d, lb)) = self.lb_memo.get(&rem_id) {
+        if let Some((d, lb)) = self.cache.lock().unwrap().lb_memo.get(&rem_id) {
             if *d >= depth {
-                self.success += 1;
+                //self.success += 1;
                 return *lb
             }
         }
@@ -183,6 +200,12 @@ impl Solver {
             self.partition(rem, &guess)
         }).collect::<Vec<_>>();
 
+        // parallel
+        //let ret: i32 = rem.len() as i32 + partitions.par_iter().map(|part| {
+        //    part.values().map(|s| {
+        //        self.lower_bound(s, depth-1)
+        //    }).sum::<i32>()
+        //}).min().unwrap();
         let ret: i32 = rem.len() as i32 + partitions.iter().map(|part| {
             part.values().map(|s| {
                 self.lower_bound(s, depth-1)
@@ -191,7 +214,7 @@ impl Solver {
 
         assert!(ret >= 2 * rem.len() as i32 - 1);
 
-        self.lb_memo.insert(rem_id, (depth, ret));
+        self.cache.lock().unwrap().lb_memo.insert(rem_id, (depth, ret));
         ret
     }
 
@@ -201,7 +224,7 @@ impl Solver {
         println!("{:?}", self.dfs_best_solution(&all, INFTY));
     }
 
-    fn dfs_best_solution(&mut self, rem: &Vec<usize>, ub: i32) -> i32 {
+    fn dfs_best_solution(&self, rem: &Vec<usize>, ub: i32) -> i32 {
         assert!(rem.len() > 0);
         if rem.len() == 1 {
             return 1;
@@ -209,7 +232,7 @@ impl Solver {
 
         let rem_id = self.get_set_id(rem);
 
-        if let Some(val) = self.best.get(&rem_id) {
+        if let Some(val) = self.cache.lock().unwrap().best.get(&rem_id) {
             return *val;
         }
 
@@ -236,6 +259,7 @@ impl Solver {
         order.ord_subset_sort_by_key(|i| penalty[*i]);
 
     
+        // TODO: parallel
         for guess in order.iter() {
             let part = &partitions[*guess];
 
@@ -257,11 +281,11 @@ impl Solver {
 
             if tmp < val {
                 val = tmp;
-                self.memo.insert(rem_id, (val, *guess, part.clone()));
+                self.cache.lock().unwrap().memo.insert(rem_id, (val, *guess, part.clone()));
             }
         }
 
-        self.best.insert(rem_id, val);
+        self.cache.lock().unwrap().best.insert(rem_id, val);
 
         val
     }
@@ -282,10 +306,14 @@ impl Solver {
             return;
         }
 
-        let rem_id = self.set_id.get(rem).unwrap();
-        let (_, guess, part) = &self.memo[rem_id];
+        let (guess, part) = {
+            let cache = self.cache.lock().unwrap();
+            let rem_id = *cache.set_id.get(rem).unwrap();
+            let (_, guess, part) = cache.memo[&rem_id].clone();
+            (guess, part)
+        };
         for ans in rem {
-            guess_seq[*ans].push(*guess);
+            guess_seq[*ans].push(guess);
         }
         for s in part.values() {
             self.dfs_build_guess_seq(guess_seq, s);
@@ -302,10 +330,10 @@ fn main() {
     solver.build_best_solution();
     //solver.build_good_solution();
 
-    println!("best.len(): {:?}", solver.best.len());
-    println!("memo.len(): {:?}", solver.memo.len());
-    println!("lb_memo.len(): {:?}", solver.lb_memo.len());
-    println!("success: {:?}", solver.success);
+    println!("best.len(): {:?}", solver.cache.lock().unwrap().best.len());
+    println!("memo.len(): {:?}", solver.cache.lock().unwrap().memo.len());
+    println!("lb_memo.len(): {:?}", solver.cache.lock().unwrap().lb_memo.len());
+    //println!("success: {:?}", solver.success);
 
     solver.write();
 
