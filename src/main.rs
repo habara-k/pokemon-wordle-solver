@@ -1,6 +1,8 @@
 use wordle_pokemon::consts::*;
 use std::collections::BTreeMap;
 use std::time::Instant;
+use std::fs;
+use std::io::Write;
 use ord_subset::{OrdSubsetIterExt,OrdSubsetSliceExt};
 
 #[derive(Clone,Copy)]
@@ -224,9 +226,15 @@ impl Solver {
         let penalty: Vec<f64> = partitions.iter().map(|part| {
             // minimize "average size - entropy"
             //part.values().map(|s| (s.len() as f64 + (s.len() as f64).log2()) * s.len() as f64).sum::<f64>()
+
             // maximize "entropy"
             part.values().map(|s| (s.len() as f64).log2() * s.len() as f64).sum::<f64>()
+
+            // minimize "average size"
+            //part.values().map(|s| s.len() as f64 * s.len() as f64).sum::<f64>()
         }).collect();
+
+
 
         let mut order: Vec<usize> = (0..self.n).collect();
         order.ord_subset_sort_by_key(|i| penalty[*i]);
@@ -261,6 +269,32 @@ impl Solver {
 
         val
     }
+
+    pub fn write(&self) {
+        let mut guess_seq: Vec<Vec<usize>> = (0..self.n).map(|_| Vec::new()).collect();
+        self.dfs_build_guess_seq(&mut guess_seq, &(0..self.n).collect());
+
+        let mut f = fs::File::create(format!("tree_n={}.txt", self.n)).unwrap();
+        for ans in 0..self.n {
+            f.write_all(format!("{:?}\n", guess_seq[ans]).as_bytes()).unwrap();
+        }
+    }
+
+    fn dfs_build_guess_seq(&self,  guess_seq: &mut Vec<Vec<usize>>, rem: &Vec<usize>) {
+        if rem.len() == 1 {
+            guess_seq[rem[0]].push(rem[0]);
+            return;
+        }
+
+        let rem_id = self.set_id.get(rem).unwrap();
+        let (_, guess, part) = &self.memo[rem_id];
+        for ans in rem {
+            guess_seq[*ans].push(*guess);
+        }
+        for s in part.values() {
+            self.dfs_build_guess_seq(guess_seq, s);
+        }
+    }
 }
 
 
@@ -268,11 +302,23 @@ fn main() {
     let start = Instant::now();
 
     let mut solver = Solver::new();
+
     solver.build_best_solution();
     //solver.build_good_solution();
+
+    // 初手ジーランス
+    //let optval = solver.partition(&(0..solver.n).collect(), &196).values().map(|s| {
+    //    solver.dfs_best_solution(s, INFTY)
+    //}).sum::<i32>() + solver.n as i32;
+    //println!("first 196: {:?}", optval);
+    //println!("first 196: {:?}", optval as f64 / solver.n as f64);
+
+
     println!("best.len(): {:?}", solver.best.len());
     println!("memo.len(): {:?}", solver.memo.len());
     println!("lb_memo.len(): {:?}", solver.lb_memo.len());
+
+    solver.write();
 
     println!(
         "elapsed time: {:?} [sec]",
