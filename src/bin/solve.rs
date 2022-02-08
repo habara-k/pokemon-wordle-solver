@@ -2,6 +2,7 @@ use std::collections::BTreeMap;
 use std::time::Instant;
 use std::fs;
 use std::io::Write;
+use std::sync::{Mutex,Arc};
 use ord_subset::{OrdSubsetIterExt,OrdSubsetSliceExt};
 use rayon::prelude::*;
 use argh::FromArgs;
@@ -17,8 +18,12 @@ struct Args {
     /// the limit depth of lower_bound dfs
     #[argh(option, default="default_lb_depth_limit()")]
     lb_depth_limit: usize,
+    /// the number of threads
+    #[argh(option, short='t', default="default_num_threads()")]
+    num_threads: usize,
 }
 fn default_lb_depth_limit() -> usize { 1 }
+fn default_num_threads() -> usize { 1 }
 
 type SetId = usize;
 type Score = i32;
@@ -55,7 +60,8 @@ struct Solver {
     lb_depth_limit: usize,
 
     judge_table: JudgeTable,
-    cache: Cache,
+    //cache: Cache,
+    cache: Arc<Mutex<Cache>>,
 }
 
 impl Solver {
@@ -71,7 +77,7 @@ impl Solver {
         Self { n, all, lb_depth_limit, judge_table, ..Default::default() }
     }
 
-    pub fn build_good_solution(&mut self) {
+    pub fn build_good_solution(&self) {
         let all = (0..self.n).collect();
         println!("期待回数(貪欲): {} = {}/{}",
             self.dfs_good_solution(&all) as f32 / self.n as f32,
@@ -79,15 +85,15 @@ impl Solver {
         );
     }
 
-    fn dfs_good_solution(&mut self, rem: &Vec<Pokemon>) -> Score {
+    fn dfs_good_solution(&self, rem: &Vec<Pokemon>) -> Score {
         assert!(rem.len() > 0);
         if rem.len() == 1 {
             return 1;
         }
 
-        let rem_id = self.cache.get_set_id(rem);
+        let rem_id = self.cache.lock().unwrap().get_set_id(rem);
 
-        if let Some((val, ..)) = self.cache.memo.get(&rem_id) {
+        if let Some((val, ..)) = self.cache.lock().unwrap().memo.get(&rem_id) {
             return *val;
         }
 
@@ -105,23 +111,24 @@ impl Solver {
             }).sum()
         }).unwrap();
 
-        let val: Score = rem.len() as Score + partitions[good_guess].iter().map(
+        // parallel
+        let val: Score = rem.len() as Score + partitions[good_guess].par_iter().map(
             |(_, s)| self.dfs_good_solution(s)).sum::<Score>();
 
-        self.cache.memo.insert(rem_id, (val, good_guess, partitions[good_guess].clone()));
+        self.cache.lock().unwrap().memo.insert(rem_id, (val, good_guess, partitions[good_guess].clone()));
 
         val
     }
 
-    fn lower_bound(&mut self, rem: &Vec<Pokemon>, depth: usize) -> Score {
+    fn lower_bound(&self, rem: &Vec<Pokemon>, depth: usize) -> Score {
         assert!(rem.len() > 0);
         if depth == 0 || rem.len() <= 2 {
             return 2 * rem.len() as Score - 1;
         }
 
-        let rem_id = self.cache.get_set_id(rem);
+        let rem_id = self.cache.lock().unwrap().get_set_id(rem);
 
-        if let Some((d, lb)) = self.cache.lb_memo.get(&rem_id) {
+        if let Some((d, lb)) = self.cache.lock().unwrap().lb_memo.get(&rem_id) {
             if *d >= depth {
                 return *lb
             }
@@ -132,7 +139,8 @@ impl Solver {
             self.judge_table.partition(rem, &guess)
         }).collect();
 
-        let ret: Score = rem.len() as Score + partitions.iter().map(|part| {
+        // parallel
+        let ret: Score = rem.len() as Score + partitions.par_iter().map(|part| {
             part.values().map(|s| {
                 self.lower_bound(s, depth-1)
             }).sum::<Score>()
@@ -140,11 +148,11 @@ impl Solver {
 
         // assert!(ret >= 2 * rem.len() as Score - 1);
 
-        self.cache.lb_memo.insert(rem_id, (depth, ret));
+        self.cache.lock().unwrap().lb_memo.insert(rem_id, (depth, ret));
         ret
     }
 
-    pub fn build_best_solution(&mut self) {
+    pub fn build_best_solution(&self) {
         let all = (0..self.n).collect();
         println!("期待回数(最適): {} = {}/{}",
             self.dfs_best_solution(&all, INFTY) as f32 / self.n as f32,
@@ -152,15 +160,15 @@ impl Solver {
         );
     }
 
-    fn dfs_best_solution(&mut self, rem: &Vec<Pokemon>, ub: Score) -> Score {
+    fn dfs_best_solution(&self, rem: &Vec<Pokemon>, ub: Score) -> Score {
         assert!(rem.len() > 0);
         if rem.len() == 1 {
             return 1;
         }
 
-        let rem_id = self.cache.get_set_id(rem);
+        let rem_id = self.cache.lock().unwrap().get_set_id(rem);
 
-        if let Some(val) = self.cache.best.get(&rem_id) {
+        if let Some(val) = self.cache.lock().unwrap().best.get(&rem_id) {
             return *val;
         }
 
@@ -207,11 +215,11 @@ impl Solver {
 
             if tmp < val {
                 val = tmp;
-                self.cache.memo.insert(rem_id, (val, *guess, part.clone()));
+                self.cache.lock().unwrap().memo.insert(rem_id, (val, *guess, part.clone()));
             }
         }
 
-        self.cache.best.insert(rem_id, val);
+        self.cache.lock().unwrap().best.insert(rem_id, val);
 
         val
     }
@@ -232,8 +240,12 @@ impl Solver {
             return;
         }
 
-        let rem_id = self.cache.set_id.get(rem).unwrap();
-        let (_, guess, part) = &self.cache.memo[&rem_id];
+        let (guess, part) = {
+            let cache = self.cache.lock().unwrap();
+            let rem_id = *cache.set_id.get(rem).unwrap();
+            let (_, guess, part) = cache.memo[&rem_id].clone();
+            (guess, part)
+        };
 
         for ans in rem {
             guess_seq[*ans].push(guess.clone());
@@ -248,14 +260,22 @@ impl Solver {
 fn main() {
     let start = Instant::now();
 
-    let mut solver = Solver::new();
+    let solver = Solver::new();
 
-    solver.build_best_solution();
+    //solver.build_best_solution();
     //solver.build_good_solution();
 
-    println!("best.len(): {:?}", solver.cache.best.len());
-    println!("memo.len(): {:?}", solver.cache.memo.len());
-    println!("lb_memo.len(): {:?}", solver.cache.lb_memo.len());
+    let args: Args = argh::from_env();
+    let pool = rayon::ThreadPoolBuilder::new().num_threads(args.num_threads).build().unwrap();
+    pool.install(|| solver.build_best_solution());
+
+    //let args: Args = argh::from_env();
+    //rayon::ThreadPoolBuilder::new().num_threads(args.num_threads).build_global().unwrap();
+    //solver.build_best_solution();
+
+    println!("best.len(): {:?}", solver.cache.lock().unwrap().best.len());
+    println!("memo.len(): {:?}", solver.cache.lock().unwrap().memo.len());
+    println!("lb_memo.len(): {:?}", solver.cache.lock().unwrap().lb_memo.len());
 
     solver.write();
 
