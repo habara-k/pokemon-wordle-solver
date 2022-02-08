@@ -9,7 +9,7 @@ use argh::FromArgs;
 use wordle_pokemon::{pokemon::*, judge::*};
 
 #[derive(FromArgs)]
-/// arguments
+/// Minimize expectation of the number of guess
 struct Args {
     /// the number of pokemons
     #[argh(option, short='n')]
@@ -22,13 +22,6 @@ fn default_lb_depth_limit() -> usize { 1 }
 
 type SetId = usize;
 type Score = i32;
-type Partition = BTreeMap<Judge,Vec<Pokemon>>;
-
-const ALL_CORRECT: Judge = ((Status::Correct as usize) << 2*0) +
-                           ((Status::Correct as usize) << 2*1) +
-                           ((Status::Correct as usize) << 2*2) +
-                           ((Status::Correct as usize) << 2*3) +
-                           ((Status::Correct as usize) << 2*4);
 
 const INFTY: Score = Score::MAX / 2;
 
@@ -78,18 +71,6 @@ impl Solver {
         Self { n, all, lb_depth_limit, judge_table, ..Default::default() }
     }
 
-    fn partition(&self, rem: &Vec<Pokemon>, guess: &Guess) -> Partition {
-        let mut ret: Partition = BTreeMap::new();
-        for ans in rem.iter() {
-            let judge = self.judge_table.judge(guess, ans);
-            if judge == ALL_CORRECT {
-                continue;
-            }
-            ret.entry(judge).or_insert(Vec::new()).push(*ans);
-        }
-        ret
-    }
-
     pub fn build_good_solution(&mut self) {
         let all = (0..self.n).collect();
         println!("期待回数(貪欲): {} = {}/{}",
@@ -112,7 +93,7 @@ impl Solver {
 
         // parallel
         let partitions: Vec<Partition> = self.all.par_iter().map(|guess| {
-            self.partition(rem, &guess)
+            self.judge_table.partition(rem, &guess)
         }).collect();
 
         let good_guess: Guess = *self.all.iter().ord_subset_min_by_key(|&guess| -> f32 {
@@ -148,7 +129,7 @@ impl Solver {
 
         // parallel
         let partitions: Vec<Partition> = self.all.par_iter().map(|guess| {
-            self.partition(rem, &guess)
+            self.judge_table.partition(rem, &guess)
         }).collect();
 
         let ret: Score = rem.len() as Score + partitions.iter().map(|part| {
@@ -191,7 +172,7 @@ impl Solver {
 
         // parallel
         let partitions: Vec<Partition> = self.all.par_iter().map(|guess| {
-            self.partition(rem, &guess)
+            self.judge_table.partition(rem, &guess)
         }).collect();
 
         let penalty: Vec<f32> = partitions.iter().map(|part| {

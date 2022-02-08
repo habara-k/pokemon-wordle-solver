@@ -1,8 +1,17 @@
+use std::collections::BTreeMap;
+
 use super::pokemon::*;
 
 pub type Guess = Pokemon;
 pub type Answer = Pokemon;
 pub type Judge = usize;
+pub type Partition = BTreeMap<Judge,Vec<Pokemon>>;
+
+pub const ALL_CORRECT: Judge = ((Status::Correct as usize) << 2*0) +
+                           ((Status::Correct as usize) << 2*1) +
+                           ((Status::Correct as usize) << 2*2) +
+                           ((Status::Correct as usize) << 2*3) +
+                           ((Status::Correct as usize) << 2*4);
 
 #[derive(Clone,Copy)]
 pub enum Status {
@@ -56,4 +65,16 @@ impl JudgeTable {
     pub fn judge(&self, guess: &Guess, ans: &Answer) -> Judge {
         return self.data[*guess][*ans];
     } 
+
+    pub fn partition(&self, rem: &Vec<Pokemon>, guess: &Guess) -> Partition {
+        let mut ret: Partition = BTreeMap::new();
+        for ans in rem.iter() {
+            let judge = self.judge(guess, ans);
+            if judge == ALL_CORRECT {
+                continue;
+            }
+            ret.entry(judge).or_insert(Vec::new()).push(*ans);
+        }
+        ret
+    }
 }
