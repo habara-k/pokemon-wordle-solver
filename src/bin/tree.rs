@@ -71,19 +71,20 @@ struct Args {
     /// the number of pokemons
     #[argh(option, short='n')]
     num_pokemons: usize,
+    /// the filepath of decision tree
+    #[argh(option, short='f')]
+    filepath: String,
 }
 
 fn main() {
     let args: Args = argh::from_env();
     let n = args.num_pokemons;
 
-    let filepath = format!("tree_n={}.txt", n);
-
-    let root = DecisionTree::new(&filepath).build(&(0..n).collect(), 0);
+    let root = DecisionTree::new(&args.filepath).build(&(0..n).collect(), 0);
 
     let mut history = vec![];
 
-    while true {
+    loop {
         let nxt = DecisionTree::next(&root, &history);
         println!("(残り{}匹) {}", nxt.rem.len(), POKEMONS[nxt.guess].iter().collect::<String>());
 

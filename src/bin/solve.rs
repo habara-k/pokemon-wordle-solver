@@ -77,6 +77,7 @@ impl Solver {
         Self { n, all, lb_depth_limit, judge_table, ..Default::default() }
     }
 
+    #[allow(dead_code)]
     pub fn build_good_solution(&self) {
         let all = (0..self.n).collect();
         println!("期待回数(貪欲): {} = {}/{}",
