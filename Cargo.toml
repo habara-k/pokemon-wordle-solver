@@ -10,3 +10,4 @@ edition = "2018"
 argh = "0.1.6"
 ord_subset = "3"
 rayon = "1.5"
+pprof = { version = "0.4", features = ["protobuf"] }

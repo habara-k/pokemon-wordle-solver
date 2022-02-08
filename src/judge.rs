@@ -1,11 +1,11 @@
-use std::collections::BTreeMap;
+use std::collections::HashMap;
 
 use super::pokemon::*;
 
 pub type Guess = Pokemon;
 pub type Answer = Pokemon;
 pub type Judge = usize;
-pub type Partition = BTreeMap<Judge,Vec<Pokemon>>;
+pub type Partition = HashMap<Judge,Vec<Pokemon>>;
 
 pub const ALL_CORRECT: Judge = ((Status::Correct as usize) << 2*0) +
                            ((Status::Correct as usize) << 2*1) +
@@ -67,7 +67,7 @@ impl JudgeTable {
     } 
 
     pub fn partition(&self, rem: &Vec<Pokemon>, guess: &Guess) -> Partition {
-        let mut ret: Partition = BTreeMap::new();
+        let mut ret: Partition = HashMap::new();
         for ans in rem.iter() {
             let judge = self.judge(guess, ans);
             if judge == ALL_CORRECT {

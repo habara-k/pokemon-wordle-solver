@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::HashMap;
 use std::time::Instant;
 use std::fs;
 use std::io::Write;
@@ -6,6 +6,7 @@ use std::sync::{Mutex,Arc};
 use ord_subset::{OrdSubsetIterExt,OrdSubsetSliceExt};
 use rayon::prelude::*;
 use argh::FromArgs;
+use pprof::protos::Message;
 
 use wordle_pokemon::{pokemon::*, judge::*};
 
@@ -32,11 +33,11 @@ const INFTY: Score = Score::MAX / 2;
 
 #[derive(Default)]
 struct Cache {
-    memo: BTreeMap<SetId, (Score, Guess, BTreeMap<Judge, Vec<Pokemon>>)>,
-    best: BTreeMap<SetId, Score>,
-    lb_memo: BTreeMap<SetId, (usize, Score)>,
+    memo: HashMap<SetId, (Score, Guess, Partition)>,
+    best: HashMap<SetId, Score>,
+    lb_memo: HashMap<SetId, (usize, Score)>,
 
-    set_id: BTreeMap<Vec<Pokemon>,SetId>,
+    set_id: HashMap<Vec<Pokemon>,SetId>,
     cnt: usize,
 }
 impl Cache {
@@ -136,13 +137,8 @@ impl Solver {
         }
 
         // parallel
-        let partitions: Vec<Partition> = self.all.par_iter().map(|guess| {
-            self.judge_table.partition(rem, &guess)
-        }).collect();
-
-        // parallel
-        let ret: Score = rem.len() as Score + partitions.par_iter().map(|part| {
-            part.values().map(|s| {
+        let ret: Score = rem.len() as Score + self.all.par_iter().map(|guess| {
+            self.judge_table.partition(rem, &guess).values().map(|s| {
                 self.lower_bound(s, depth-1)
             }).sum::<Score>()
         }).min().unwrap();
@@ -266,6 +262,8 @@ fn main() {
     //solver.build_best_solution();
     //solver.build_good_solution();
 
+    let guard = pprof::ProfilerGuard::new(100).unwrap();
+
     let args: Args = argh::from_env();
     let pool = rayon::ThreadPoolBuilder::new().num_threads(args.num_threads).build().unwrap();
     pool.install(|| solver.build_best_solution());
@@ -273,6 +271,19 @@ fn main() {
     //let args: Args = argh::from_env();
     //rayon::ThreadPoolBuilder::new().num_threads(args.num_threads).build_global().unwrap();
     //solver.build_best_solution();
+
+    match guard.report().build() {
+        Ok(report) => {
+            let mut file = fs::File::create("profile.pb").unwrap();
+            let profile = report.pprof().unwrap();
+
+            let mut content = Vec::new();
+            profile.encode(&mut content).unwrap();
+            file.write_all(&content).unwrap();
+        }
+        Err(_) => {}
+    };
+
 
     println!("best.len(): {:?}", solver.cache.lock().unwrap().best.len());
     println!("memo.len(): {:?}", solver.cache.lock().unwrap().memo.len());
