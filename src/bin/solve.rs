@@ -6,7 +6,7 @@ use std::sync::{Mutex,Arc};
 use ord_subset::{OrdSubsetIterExt,OrdSubsetSliceExt};
 use rayon::prelude::*;
 use argh::FromArgs;
-use pprof::protos::Message;
+//use pprof::protos::Message;
 
 use wordle_pokemon::{pokemon::*, judge::*};
 
@@ -259,31 +259,23 @@ fn main() {
 
     let solver = Solver::new();
 
-    //solver.build_best_solution();
-    //solver.build_good_solution();
-
-    let guard = pprof::ProfilerGuard::new(100).unwrap();
+    //let guard = pprof::ProfilerGuard::new(100).unwrap();
 
     let args: Args = argh::from_env();
     let pool = rayon::ThreadPoolBuilder::new().num_threads(args.num_threads).build().unwrap();
     pool.install(|| solver.build_best_solution());
 
-    //let args: Args = argh::from_env();
-    //rayon::ThreadPoolBuilder::new().num_threads(args.num_threads).build_global().unwrap();
-    //solver.build_best_solution();
+    //match guard.report().build() {
+    //    Ok(report) => {
+    //        let mut file = fs::File::create("profile.pb").unwrap();
+    //        let profile = report.pprof().unwrap();
 
-    match guard.report().build() {
-        Ok(report) => {
-            let mut file = fs::File::create("profile.pb").unwrap();
-            let profile = report.pprof().unwrap();
-
-            let mut content = Vec::new();
-            profile.encode(&mut content).unwrap();
-            file.write_all(&content).unwrap();
-        }
-        Err(_) => {}
-    };
-
+    //        let mut content = Vec::new();
+    //        profile.encode(&mut content).unwrap();
+    //        file.write_all(&content).unwrap();
+    //    }
+    //    Err(_) => {}
+    //};
 
     println!("best.len(): {:?}", solver.cache.lock().unwrap().best.len());
     println!("memo.len(): {:?}", solver.cache.lock().unwrap().memo.len());
