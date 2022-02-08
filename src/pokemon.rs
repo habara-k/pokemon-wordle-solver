@@ -1,5 +1,6 @@
-pub type Pokemon = [char;5];
-pub const POKEMONS: [Pokemon;511] = [
+pub type Pokemon = usize;
+
+pub const POKEMONS: [[char;5];511] = [
 	['フ','シ','ギ','ダ','ネ'], 
 	['フ','シ','ギ','ソ','ウ'],
 	['フ','シ','ギ','バ','ナ'],

@@ -1,1 +1,2 @@
-pub mod consts;
+pub mod pokemon;
+pub mod judge;
