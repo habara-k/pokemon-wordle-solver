@@ -58,14 +58,6 @@ struct Solver {
 
     judge_table: Vec<Vec<usize>>,
     cache: Arc<Mutex<Cache>>,
-    //memo: BTreeMap<SetId, (i32, usize, BTreeMap<usize, Vec<usize>>)>,
-    //best: BTreeMap<SetId, i32>,
-    //lb_memo: BTreeMap<SetId, (usize, i32)>,
-
-    //set_id: BTreeMap<Vec<usize>,SetId>,
-    //cnt: usize,
-
-    //success: usize,
 }
 
 impl Solver {
@@ -169,9 +161,6 @@ impl Solver {
             }).sum()
         }).unwrap();
 
-        // parallel
-        //let val = rem.len() as i32 + partitions[good_guess].par_iter().map(
-        //    |(_, s)| self.dfs_good_solution(s)).sum::<i32>();
         let val = rem.len() as i32 + partitions[good_guess].iter().map(
             |(_, s)| self.dfs_good_solution(s)).sum::<i32>();
 
@@ -190,7 +179,6 @@ impl Solver {
 
         if let Some((d, lb)) = self.cache.lock().unwrap().lb_memo.get(&rem_id) {
             if *d >= depth {
-                //self.success += 1;
                 return *lb
             }
         }
@@ -200,12 +188,6 @@ impl Solver {
             self.partition(rem, &guess)
         }).collect::<Vec<_>>();
 
-        // parallel
-        //let ret: i32 = rem.len() as i32 + partitions.par_iter().map(|part| {
-        //    part.values().map(|s| {
-        //        self.lower_bound(s, depth-1)
-        //    }).sum::<i32>()
-        //}).min().unwrap();
         let ret: i32 = rem.len() as i32 + partitions.iter().map(|part| {
             part.values().map(|s| {
                 self.lower_bound(s, depth-1)
@@ -257,7 +239,6 @@ impl Solver {
 
         let mut order: Vec<usize> = (0..self.n).collect();
         order.ord_subset_sort_by_key(|i| penalty[*i]);
-
     
         // TODO: parallel
         for guess in order.iter() {
@@ -292,11 +273,11 @@ impl Solver {
 
     pub fn write(&self) {
         let mut guess_seq: Vec<Vec<usize>> = (0..self.n).map(|_| Vec::new()).collect();
-        self.dfs_build_guess_seq(&mut guess_seq, &(0..self.n).collect());
+        self.dfs_build_guess_seq(&mut guess_seq, &self.all);
 
         let mut f = fs::File::create(format!("tree_n={}.txt", self.n)).unwrap();
-        for ans in 0..self.n {
-            f.write_all(format!("{:?}\n", guess_seq[ans]).as_bytes()).unwrap();
+        for guess in &guess_seq {
+            f.write_all(format!("{}\n", guess.iter().map(|g| g.to_string()).collect::<Vec<String>>().join(" ")).as_bytes()).unwrap();
         }
     }
 
@@ -333,7 +314,6 @@ fn main() {
     println!("best.len(): {:?}", solver.cache.lock().unwrap().best.len());
     println!("memo.len(): {:?}", solver.cache.lock().unwrap().memo.len());
     println!("lb_memo.len(): {:?}", solver.cache.lock().unwrap().lb_memo.len());
-    //println!("success: {:?}", solver.success);
 
     solver.write();
 
