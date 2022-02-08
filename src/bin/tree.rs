@@ -83,10 +83,10 @@ fn main() {
 
     let mut history = vec![];
 
-    let nxt = DecisionTree::next(&root, &history);
-    println!("(残り{}匹) {}", nxt.rem.len(), POKEMONS[nxt.guess].iter().collect::<String>());
-
     while true {
+        let nxt = DecisionTree::next(&root, &history);
+        println!("(残り{}匹) {}", nxt.rem.len(), POKEMONS[nxt.guess].iter().collect::<String>());
+
         print!("-> ");
         std::io::stdout().flush().unwrap();
         let mut s = String::new();
@@ -107,8 +107,5 @@ fn main() {
             }
             judge
         });
-
-        let nxt = DecisionTree::next(&root, &history);
-        println!("(残り{}匹) {}", nxt.rem.len(), POKEMONS[nxt.guess].iter().collect::<String>());
     }
 }
