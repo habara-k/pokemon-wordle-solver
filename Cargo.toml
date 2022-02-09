@@ -8,6 +8,6 @@ edition = "2018"
 
 [dependencies]
 argh = "0.1.6"
-ord_subset = "3"
+ordered-float = "2.0"
 rayon = "1.5"
 pprof = { version = "0.4", features = ["protobuf"] }

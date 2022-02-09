@@ -9,7 +9,7 @@ use wordle_pokemon::{pokemon::*, judge::*};
 #[derive(Default)]
 struct Node {
     guess: usize,
-    rem: Vec<Pokemon>,
+    rem: Vec<Answer>,
     edges: HashMap<Judge,Rc<Node>>,
 }
 
@@ -31,7 +31,7 @@ impl DecisionTree {
         Self { guess_seq, judge_table: JudgeTable::new(n) }
     }
 
-    pub fn build(&self, rem: &Vec<Pokemon>, depth: usize) -> Rc<Node> {
+    pub fn build(&self, rem: &Vec<Answer>, depth: usize) -> Rc<Node> {
         if rem.len() == 1 {
             assert!(self.guess_seq[rem[0]].len() == depth + 1);
             assert!(self.guess_seq[rem[0]][depth] == rem[0]);
@@ -71,8 +71,8 @@ struct Args {
     /// the number of pokemons
     #[argh(option, short='n')]
     num_pokemons: usize,
-    /// the filepath of decision tree
-    #[argh(option, short='f')]
+    /// the filepath of decision tree input
+    #[argh(option, short='i')]
     filepath: String,
 }
 
@@ -86,7 +86,7 @@ fn main() {
 
     loop {
         let nxt = DecisionTree::next(&root, &history);
-        println!("(残り{}匹) {}", nxt.rem.len(), POKEMONS[nxt.guess].iter().collect::<String>());
+        println!("(残り{}匹) {}", nxt.rem.len(), POKEMONS[nxt.guess]);
 
         print!("-> ");
         std::io::stdout().flush().unwrap();
