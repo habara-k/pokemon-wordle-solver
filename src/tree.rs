@@ -2,18 +2,17 @@ use std::collections::HashMap;
 use std::rc::Rc;
 use std::fs;
 use std::io::Write;
-use argh::FromArgs;
 
-use wordle_pokemon::{pokemon::*, judge::*};
+use super::{pokemon::*, judge::*};
 
 #[derive(Default)]
-struct Node {
-    guess: usize,
-    rem_ans: Vec<Answer>,
-    edges: HashMap<Judge,Rc<Node>>,
+pub struct Node {
+    pub guess: usize,
+    pub rem_ans: Vec<Answer>,
+    pub edges: HashMap<Judge,Rc<Node>>,
 }
 impl Node {
-    fn write(&self, out: &mut fs::File) {
+    pub fn write(&self, out: &mut fs::File) {
         if self.edges.len() == 0 {
             out.write_all(format!("{{\"guess\":\"{}\"}}", POKEMONS[self.guess]).as_bytes()).unwrap();
             return;
@@ -32,7 +31,7 @@ impl Node {
 }
 
 #[derive(Default)]
-struct DecisionTree {
+pub struct DecisionTree {
     guess_seq: Vec<Vec<Guess>>,
     judge_table: JudgeTable,
 }
@@ -77,60 +76,4 @@ impl DecisionTree {
         }
         v
     }
-}
-
-
-#[derive(FromArgs)]
-/// Build decision tree
-struct Args {
-    /// the number of pokemons
-    #[argh(option, short='n')]
-    num_pokemons: usize,
-
-    /// the filepath of decision tree input
-    #[argh(option, short='i')]
-    filepath: String,
-}
-
-fn main() {
-    let args: Args = argh::from_env();
-    let n = args.num_pokemons;
-
-    let pokemons = PokemonList::new(n);
-
-    let root = DecisionTree::new(&args.filepath).build(&pokemons.all_ans, 0);
-
-
-    let mut f = fs::File::create("tree.json").unwrap();
-    root.write(&mut f);
-
-    return;
-
-    // let mut history = vec![];
-
-    // loop {
-    //     let nxt = DecisionTree::next(&root, &history);
-    //     println!("(残り{}匹) {}", nxt.rem_ans.len(), POKEMONS[nxt.guess]);
-
-    //     print!("-> ");
-    //     std::io::stdout().flush().unwrap();
-    //     let mut s = String::new();
-    //     std::io::stdin().read_line(&mut s).unwrap();
-    //     let s = s.trim().to_string();
-    //     if s.len() != 5 {
-    //         println!("s.len(): {}", s.len());
-    //     }
-
-    //     assert!(s.len() == 5);
-    //     history.push({
-    //         let judge = s.chars().enumerate().map(|(i, c)| {
-    //             c.to_digit(10).unwrap() << 2*i
-    //         }).sum::<u32>() as Judge;
-    //         if judge == ALL_CORRECT {
-    //             println!("Congratulations!!!");
-    //             break;
-    //         }
-    //         judge
-    //     });
-    // }
 }

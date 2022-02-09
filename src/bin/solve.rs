@@ -27,7 +27,7 @@ struct Args {
 
     /// the filepath of decision tree output
     #[argh(option, short='o')]
-    filepath: String,
+    output: String,
 }
 fn default_lb_depth_limit() -> usize { 1 }
 fn default_num_threads() -> usize { 1 }
@@ -333,5 +333,5 @@ fn main() {
     println!("memo.len(): {:?}", solver.cache.lock().unwrap().memo.len());
     println!("lb_memo.len(): {:?}", solver.cache.lock().unwrap().lb_memo.len());
 
-    solver.write(&args.filepath);
+    solver.write(&args.output);
 }
