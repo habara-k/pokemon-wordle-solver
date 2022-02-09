@@ -13,6 +13,13 @@ function on_enter(e) {
       return;
     }
 
+    if (input.value == "22222") {
+      output.value += "22222\nCongratulations!!!\n";
+      output.value += "If you want to play again, please restart.";
+      output.scrollTop = output.scrollHeight;
+      return;
+    }
+
     if (!(input.value in json_obj.edges)) {
       output.value += "Incorrect input.\n";
       output.value += "Please restart, or type the correct response again.\n-> "
