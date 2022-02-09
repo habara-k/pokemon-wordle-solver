@@ -12,6 +12,24 @@ struct Node {
     rem_ans: Vec<Answer>,
     edges: HashMap<Judge,Rc<Node>>,
 }
+impl Node {
+    fn write(&self, out: &mut fs::File) {
+        if self.edges.len() == 0 {
+            out.write_all(format!("{{\"guess\":\"{}\"}}", POKEMONS[self.guess]).as_bytes()).unwrap();
+            return;
+        }
+        out.write_all(format!("{{\"guess\":\"{}\",\"edges\":{{", POKEMONS[self.guess]).as_bytes()).unwrap();
+        for (i, (judge, ch)) in self.edges.iter().enumerate() {
+            let judge = (0..5).map(|i| (judge >> 2*i & 0b11).to_string()).collect::<Vec<String>>().join("");
+            out.write_all(format!("\"{}\":", judge).as_bytes()).unwrap();
+            ch.write(out);
+            if i+1 < self.edges.len() {
+                out.write_all(",".as_bytes()).unwrap();
+            }
+        }
+        out.write_all("}}".as_bytes()).unwrap();
+    }
+}
 
 #[derive(Default)]
 struct DecisionTree {
@@ -82,31 +100,37 @@ fn main() {
 
     let root = DecisionTree::new(&args.filepath).build(&pokemons.all_ans, 0);
 
-    let mut history = vec![];
 
-    loop {
-        let nxt = DecisionTree::next(&root, &history);
-        println!("(残り{}匹) {}", nxt.rem_ans.len(), POKEMONS[nxt.guess]);
+    let mut f = fs::File::create("tree.json").unwrap();
+    root.write(&mut f);
 
-        print!("-> ");
-        std::io::stdout().flush().unwrap();
-        let mut s = String::new();
-        std::io::stdin().read_line(&mut s).unwrap();
-        let s = s.trim().to_string();
-        if s.len() != 5 {
-            println!("s.len(): {}", s.len());
-        }
+    return;
 
-        assert!(s.len() == 5);
-        history.push({
-            let judge = s.chars().enumerate().map(|(i, c)| {
-                c.to_digit(10).unwrap() << 2*i
-            }).sum::<u32>() as Judge;
-            if judge == ALL_CORRECT {
-                println!("Congratulations!!!");
-                break;
-            }
-            judge
-        });
-    }
+    // let mut history = vec![];
+
+    // loop {
+    //     let nxt = DecisionTree::next(&root, &history);
+    //     println!("(残り{}匹) {}", nxt.rem_ans.len(), POKEMONS[nxt.guess]);
+
+    //     print!("-> ");
+    //     std::io::stdout().flush().unwrap();
+    //     let mut s = String::new();
+    //     std::io::stdin().read_line(&mut s).unwrap();
+    //     let s = s.trim().to_string();
+    //     if s.len() != 5 {
+    //         println!("s.len(): {}", s.len());
+    //     }
+
+    //     assert!(s.len() == 5);
+    //     history.push({
+    //         let judge = s.chars().enumerate().map(|(i, c)| {
+    //             c.to_digit(10).unwrap() << 2*i
+    //         }).sum::<u32>() as Judge;
+    //         if judge == ALL_CORRECT {
+    //             println!("Congratulations!!!");
+    //             break;
+    //         }
+    //         judge
+    //     });
+    // }
 }
