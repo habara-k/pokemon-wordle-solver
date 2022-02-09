@@ -113,7 +113,8 @@ impl Solver {
             // 従って残りの3つの候補から宣言する場合だけ考えれば良い.
             rem_ans
         } else {
-            &self.pokemons.all_guess
+            // おそらく5文字の宣言が最適
+            &self.pokemons.all_ans
         };
 
         let good_guess = all_guess.par_iter().min_by_key(|guess| {
