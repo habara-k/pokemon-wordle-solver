@@ -3,7 +3,7 @@ const tree_json = `{"guess":"ランクルス","edges":{"00200":{"guess":"ヌマ�
 let input = document.getElementById("input");
 let output = document.getElementById("output");
 output.scrollTop = output.scrollHeight;
-let json_obj;
+let json_obj = {};
 
 input.addEventListener("keypress", on_enter);
 
@@ -17,6 +17,7 @@ function on_enter(e) {
       output.value += "22222\nCongratulations!!!\n";
       output.value += "If you want to play again, please restart.";
       output.scrollTop = output.scrollHeight;
+      json_obj = {};
       return;
     }
 
@@ -33,6 +34,7 @@ function on_enter(e) {
     if (!("edges" in json_obj)) {
       output.value += "22222\nCongratulations!!!\n";
       output.value += "If you want to play again, please restart.";
+      json_obj = {};
     }
     output.scrollTop = output.scrollHeight;
   }
