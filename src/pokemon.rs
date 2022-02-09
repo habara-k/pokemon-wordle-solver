@@ -1,4 +1,32 @@
 pub type Pokemon = usize;
+pub type Guess = Pokemon;
+pub type Answer = Pokemon;
+
+#[derive(Default)]
+pub struct PokemonList {
+    pub all_ans: Vec<Answer>,
+    pub all_guess: Vec<Guess>,
+    pub is_valid_ans: Vec<bool>,
+    pub is_valid_guess: Vec<bool>,
+}
+
+impl PokemonList {
+    pub fn new(n: usize) -> Self {
+        let is_valid_ans: Vec<bool> = (0..n)
+        .map(|i| POKEMONS[i].chars().collect::<Vec<char>>().len() == 5)
+        .collect();
+        let is_valid_guess: Vec<bool> = vec![true; n];
+
+        let all_ans: Vec<Answer> = (0..n)
+        .filter(|&i| is_valid_ans[i])
+        .collect();
+        let all_guess: Vec<Guess> = (0..n)
+        .filter(|&i| is_valid_guess[i])
+        .collect();
+
+        Self { all_ans, all_guess, is_valid_ans, is_valid_guess }
+    }
+}
 
 pub const POKEMONS: [&str;846] = [
     "フシギダネ",

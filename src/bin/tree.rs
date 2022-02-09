@@ -9,7 +9,7 @@ use wordle_pokemon::{pokemon::*, judge::*};
 #[derive(Default)]
 struct Node {
     guess: usize,
-    rem: Vec<Answer>,
+    rem_ans: Vec<Answer>,
     edges: HashMap<Judge,Rc<Node>>,
 }
 
@@ -31,35 +31,32 @@ impl DecisionTree {
         Self { guess_seq, judge_table: JudgeTable::new(n) }
     }
 
-    pub fn build(&self, rem: &Vec<Answer>, depth: usize) -> Rc<Node> {
-        if rem.len() == 1 {
-            assert!(self.guess_seq[rem[0]].len() == depth + 1);
-            assert!(self.guess_seq[rem[0]][depth] == rem[0]);
-            return Rc::new(Node{ guess: rem[0], rem: rem.clone(), ..Default::default() });
+    pub fn build(&self, rem_ans: &Vec<Answer>, depth: usize) -> Rc<Node> {
+        if rem_ans.len() == 1 {
+            assert!(self.guess_seq[rem_ans[0]].len() == depth + 1);
+            assert!(self.guess_seq[rem_ans[0]][depth] == rem_ans[0]);
+            return Rc::new(Node{ guess: rem_ans[0], rem_ans: rem_ans.clone(), ..Default::default() });
         }
 
-        let guess = self.guess_seq[rem[0]][depth];
-        for i in 1..rem.len() {
-            assert!(self.guess_seq[rem[i]].len() > depth);
-            assert!(guess == self.guess_seq[rem[i]][depth]);
+        let guess = self.guess_seq[rem_ans[0]][depth];
+        for i in 1..rem_ans.len() {
+            assert!(self.guess_seq[rem_ans[i]].len() > depth);
+            assert!(guess == self.guess_seq[rem_ans[i]][depth]);
         }
 
-        let edges: HashMap<Judge,Rc<Node>> = self.judge_table.partition(rem, &guess).iter().map(|(judge, s)| {
+        let edges: HashMap<Judge,Rc<Node>> = self.judge_table.partition(rem_ans, &guess).iter().map(|(judge, s)| {
             (*judge, self.build(s, depth + 1))
         }).collect();
 
-        return Rc::new(Node{ guess, edges, rem: rem.clone() });
+        return Rc::new(Node{ guess, edges, rem_ans: rem_ans.clone() });
     }
 
 
     pub fn next(node: &Rc<Node>, history: &Vec<Judge>) -> Rc<Node> {
-        // 今まで正しくguessしてきたことを要求
-
         let mut v = Rc::clone(node);
         for judge in history {
             v = Rc::clone(&v.edges[judge]);
         }
-
         v
     }
 }
@@ -71,6 +68,7 @@ struct Args {
     /// the number of pokemons
     #[argh(option, short='n')]
     num_pokemons: usize,
+
     /// the filepath of decision tree input
     #[argh(option, short='i')]
     filepath: String,
@@ -80,13 +78,15 @@ fn main() {
     let args: Args = argh::from_env();
     let n = args.num_pokemons;
 
-    let root = DecisionTree::new(&args.filepath).build(&(0..n).collect(), 0);
+    let pokemons = PokemonList::new(n);
+
+    let root = DecisionTree::new(&args.filepath).build(&pokemons.all_ans, 0);
 
     let mut history = vec![];
 
     loop {
         let nxt = DecisionTree::next(&root, &history);
-        println!("(残り{}匹) {}", nxt.rem.len(), POKEMONS[nxt.guess]);
+        println!("(残り{}匹) {}", nxt.rem_ans.len(), POKEMONS[nxt.guess]);
 
         print!("-> ");
         std::io::stdout().flush().unwrap();

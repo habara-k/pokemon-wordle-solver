@@ -2,8 +2,6 @@ use std::collections::HashMap;
 
 use super::pokemon::*;
 
-pub type Guess = Pokemon;
-pub type Answer = Pokemon;
 pub type Judge = usize;
 pub type Partition = HashMap<Judge,Vec<Answer>>;
 
@@ -23,27 +21,14 @@ pub enum Status {
 #[derive(Default)]
 pub struct JudgeTable {
     data: Vec<Vec<Judge>>,
-    pub all_ans: Vec<Answer>,
-    pub all_guess: Vec<Guess>,
 }
 impl JudgeTable {
     pub fn new(n: usize) -> Self {
-
-        let is_valid_ans: Vec<bool> = (0..n)
-        .map(|i| POKEMONS[i].chars().collect::<Vec<char>>().len() == 5)
-        .collect();
-        let is_valid_guess: Vec<bool> = vec![true; n];
-
-        let all_ans: Vec<Answer> = (0..n)
-        .filter(|&i| is_valid_ans[i])
-        .collect();
-        let all_guess: Vec<Guess> = (0..n)
-        .filter(|&i| is_valid_guess[i])
-        .collect();
+        let pokemons = PokemonList::new(n);
 
         let judge = |guess: &Answer, ans: &Guess| -> Judge {
-            assert!(is_valid_guess[*guess]);
-            assert!(is_valid_ans[*ans]);
+            assert!(pokemons.is_valid_guess[*guess]);
+            assert!(pokemons.is_valid_ans[*ans]);
 
             let guess: Vec<char> = POKEMONS[*guess].chars().collect();
             let ans: Vec<char> = POKEMONS[*ans].chars().collect();
@@ -78,7 +63,7 @@ impl JudgeTable {
 
 
         let data = (0..n).map(|ans| {
-            if is_valid_ans[ans] {
+            if pokemons.is_valid_ans[ans] {
                 (0..n).map(|guess| {
                     judge(&guess, &ans)
                 }).collect()
@@ -87,7 +72,7 @@ impl JudgeTable {
             }
         }).collect();
 
-        Self { data, all_guess, all_ans }
+        Self { data }
     }
 
     pub fn judge(&self, guess: &Guess, ans: &Answer) -> Judge {

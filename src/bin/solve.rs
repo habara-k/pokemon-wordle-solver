@@ -8,7 +8,7 @@ use rayon::prelude::*;
 use argh::FromArgs;
 //use pprof::protos::Message;
 
-use wordle_pokemon::judge::*;
+use wordle_pokemon::{pokemon::*,judge::*};
 
 #[derive(FromArgs)]
 /// Minimize expectation of the number of guess
@@ -16,12 +16,15 @@ struct Args {
     /// the number of pokemons
     #[argh(option, short='n')]
     num_pokemons: usize,
+
     /// the limit depth of lower_bound dfs
     #[argh(option, default="default_lb_depth_limit()")]
     lb_depth_limit: usize,
+
     /// the number of threads
     #[argh(option, short='t', default="default_num_threads()")]
     num_threads: usize,
+
     /// the filepath of decision tree output
     #[argh(option, short='o')]
     filepath: String,
@@ -62,6 +65,7 @@ struct Solver {
     n: usize,
     lb_depth_limit: usize,
 
+    pokemons: PokemonList,
     judge_table: JudgeTable,
     cache: Arc<Mutex<Cache>>,
 }
@@ -73,16 +77,17 @@ impl Solver {
         let n = args.num_pokemons;
         let lb_depth_limit = args.lb_depth_limit;
 
+        let pokemons = PokemonList::new(n);
         let judge_table = JudgeTable::new(n);
 
-        Self { n, lb_depth_limit, judge_table, ..Default::default() }
+        Self { n, lb_depth_limit, pokemons, judge_table, ..Default::default() }
     }
 
     #[allow(dead_code)]
     pub fn build_good_solution(&self) {
         println!("期待回数(貪欲): {} = {}/{}",
-            self.dfs_good_solution(&self.judge_table.all_ans) as f32 / self.n as f32,
-            self.dfs_good_solution(&self.judge_table.all_ans), self.n
+            self.dfs_good_solution(&self.pokemons.all_ans) as f32 / self.pokemons.all_ans.len() as f32,
+            self.dfs_good_solution(&self.pokemons.all_ans), self.pokemons.all_ans.len()
         );
     }
 
@@ -108,7 +113,7 @@ impl Solver {
             // 従って残りの3つの候補から宣言する場合だけ考えれば良い.
             rem_ans
         } else {
-            &self.judge_table.all_guess
+            &self.pokemons.all_guess
         };
 
         let good_guess = all_guess.par_iter().min_by_key(|guess| {
@@ -151,7 +156,7 @@ impl Solver {
             // 従って残りの3つの候補から宣言する場合だけ考えれば良い.
             rem_ans
         } else {
-            &self.judge_table.all_guess
+            &self.pokemons.all_guess
         };
 
         let ret: Score = rem_ans.len() as Score + all_guess.par_iter().map(|guess| {
@@ -168,8 +173,8 @@ impl Solver {
 
     pub fn build_best_solution(&self) {
         println!("期待回数(最適): {} = {}/{}",
-            self.dfs_best_solution(&self.judge_table.all_ans, INFTY) as f32 / self.n as f32,
-            self.dfs_best_solution(&self.judge_table.all_ans, INFTY), self.n
+            self.dfs_best_solution(&self.pokemons.all_ans, INFTY) as f32 / self.pokemons.all_ans.len() as f32,
+            self.dfs_best_solution(&self.pokemons.all_ans, INFTY), self.pokemons.all_ans.len()
         );
     }
 
@@ -201,7 +206,7 @@ impl Solver {
             // 従って残りの3つの候補から宣言する場合だけ考えれば良い.
             rem_ans
         } else {
-            &self.judge_table.all_guess
+            &self.pokemons.all_guess
         };
 
         let partitions: Vec<Partition> = all_guess.par_iter().map(|guess| {
@@ -258,7 +263,7 @@ impl Solver {
 
     pub fn write(&self, filepath: &str) {
         let mut guess_seq: Vec<Vec<Guess>> = (0..self.n).map(|_| Vec::new()).collect();
-        self.dfs_build_guess_seq(&mut guess_seq, &self.judge_table.all_ans);
+        self.dfs_build_guess_seq(&mut guess_seq, &self.pokemons.all_ans);
 
         let mut f = fs::File::create(filepath).unwrap();
         for guess in &guess_seq {
