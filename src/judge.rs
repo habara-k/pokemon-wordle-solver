@@ -28,7 +28,7 @@ impl JudgeTable {
     pub fn new(ans_until: usize, guess_until: usize) -> Self {
         let pokemons = PokemonList::new(ans_until, guess_until);
 
-        let judge = |guess: &Answer, ans: &Guess| -> Judge {
+        let judge = |guess: &Guess, ans: &Answer| -> Judge {
             assert!(pokemons.is_valid_guess[*guess]);
             assert!(pokemons.is_valid_ans[*ans]);
 

@@ -14,5 +14,6 @@ https://habara-k.github.io/pokemon-wordle-solver/
 | mode (n_ans)  | optimal expectation | worst case | computation time[s] |
 |---------------|--------------------:|-----------:|--------------------:|
 | until DP(282) | 3.3404 (= 942/282)  | 6          | 95                  |
+| until BW(380) | 3.4947 (= 1328/380) | 6          | 1051                |
 
 excluding `ニドラン♂, ニドラン♀, ポリゴン2, ポリゴンZ`.

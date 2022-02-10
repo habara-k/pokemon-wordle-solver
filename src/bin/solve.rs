@@ -40,7 +40,7 @@ impl Cache {
 #[derive(Default)]
 struct Solver {
     ans_until: usize,
-    guess_until: usize,
+    //guess_until: usize,
 
     pokemons: PokemonList,
     judge_table: JudgeTable,
@@ -56,7 +56,7 @@ impl Solver {
 
         Self {
             ans_until,
-            guess_until,
+            //guess_until,
             pokemons,
             judge_table,
             ..Default::default()

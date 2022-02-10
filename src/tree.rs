@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::fs;
 use std::io::Write;
 use std::rc::Rc;
@@ -10,16 +10,19 @@ pub enum Node {
     NonTerminal {
         guess: usize,
         rem_ans: Vec<Answer>,
-        edges: HashMap<Judge, Rc<Node>>,
+        edges: BTreeMap<Judge, Rc<Node>>,
     },
 }
 
 impl Node {
     pub fn write(&self, out: &mut fs::File) {
         match self {
-            Node::NonTerminal { guess, edges, .. } => {
+            Node::NonTerminal { guess, edges, rem_ans } => {
                 out.write_all(
-                    format!("{{\"guess\":\"{}\",\"edges\":{{", POKEMONS[*guess]).as_bytes(),
+                    format!("{{\"guess\":\"{}\",\"rem\":{},\"edges\":{{",
+                    POKEMONS[*guess],
+                    rem_ans.len(),
+                    ).as_bytes()
                 )
                 .unwrap();
                 for (i, (judge, ch)) in edges.iter().enumerate() {
@@ -85,17 +88,11 @@ impl DecisionTree {
 
         let guess = self.guess_seq[rem_ans[0]][depth];
         for i in 1..rem_ans.len() {
-            if self.guess_seq[rem_ans[i]].len() <= depth {
-                println!("{:?}", self.guess_seq[rem_ans[i]]);
-                println!("{:?}", rem_ans[i]);
-                println!("{:?}", POKEMONS[rem_ans[i]]);
-                println!("{:?}", depth);
-            }
             assert!(self.guess_seq[rem_ans[i]].len() > depth);
             assert!(guess == self.guess_seq[rem_ans[i]][depth]);
         }
 
-        let mut edges: HashMap<Judge, Rc<Node>> = self
+        let mut edges: BTreeMap<Judge, Rc<Node>> = self
             .judge_table
             .partition(rem_ans, &guess)
             .iter()
