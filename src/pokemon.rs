@@ -13,22 +13,23 @@ pub struct PokemonList {
 impl PokemonList {
     pub fn new(n: usize) -> Self {
         let is_valid_ans: Vec<bool> = (0..n)
-        .map(|i| POKEMONS[i].chars().collect::<Vec<char>>().len() == 5)
-        .collect();
+            .map(|i| POKEMONS[i].chars().collect::<Vec<char>>().len() == 5)
+            .collect();
         let is_valid_guess: Vec<bool> = vec![true; n];
 
-        let all_ans: Vec<Answer> = (0..n)
-        .filter(|&i| is_valid_ans[i])
-        .collect();
-        let all_guess: Vec<Guess> = (0..n)
-        .filter(|&i| is_valid_guess[i])
-        .collect();
+        let all_ans: Vec<Answer> = (0..n).filter(|&i| is_valid_ans[i]).collect();
+        let all_guess: Vec<Guess> = (0..n).filter(|&i| is_valid_guess[i]).collect();
 
-        Self { all_ans, all_guess, is_valid_ans, is_valid_guess }
+        Self {
+            all_ans,
+            all_guess,
+            is_valid_ans,
+            is_valid_guess,
+        }
     }
 }
 
-pub const POKEMONS: [&str;846] = [
+pub const POKEMONS: [&str; 846] = [
     "フシギダネ",
     "フシギソウ",
     "フシギバナ",

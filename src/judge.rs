@@ -3,15 +3,15 @@ use std::collections::HashMap;
 use super::pokemon::*;
 
 pub type Judge = usize;
-pub type Partition = HashMap<Judge,Vec<Answer>>;
+pub type Partition = HashMap<Judge, Vec<Answer>>;
 
-pub const ALL_CORRECT: Judge = ((Status::Correct as usize) << 2*0) +
-                           ((Status::Correct as usize) << 2*1) +
-                           ((Status::Correct as usize) << 2*2) +
-                           ((Status::Correct as usize) << 2*3) +
-                           ((Status::Correct as usize) << 2*4);
+pub const ALL_CORRECT: Judge = ((Status::Correct as usize) << 2 * 0)
+    + ((Status::Correct as usize) << 2 * 1)
+    + ((Status::Correct as usize) << 2 * 2)
+    + ((Status::Correct as usize) << 2 * 3)
+    + ((Status::Correct as usize) << 2 * 4);
 
-#[derive(Clone,Copy)]
+#[derive(Clone, Copy)]
 pub enum Status {
     Nowhere = 0,
     Wrong = 1,
@@ -36,7 +36,7 @@ impl JudgeTable {
             let (mut ret, mut guess_used, mut ans_used) = (0, 0, 0);
             for i in 0..guess.len() {
                 if guess[i] == ans[i] {
-                    ret |= (Status::Correct as usize) << 2*i;
+                    ret |= (Status::Correct as usize) << 2 * i;
                     guess_used |= 1 << i;
                     ans_used |= 1 << i;
                 }
@@ -51,7 +51,7 @@ impl JudgeTable {
                         continue;
                     }
                     if guess[i] == ans[j] {
-                        ret |= (Status::Wrong as usize) << 2*i;
+                        ret |= (Status::Wrong as usize) << 2 * i;
                         guess_used |= 1 << i;
                         ans_used |= 1 << j;
                         break;
@@ -61,23 +61,22 @@ impl JudgeTable {
             ret
         };
 
-
-        let data = (0..n).map(|ans| {
-            if pokemons.is_valid_ans[ans] {
-                (0..n).map(|guess| {
-                    judge(&guess, &ans)
-                }).collect()
-            } else {
-                vec![]
-            }
-        }).collect();
+        let data = (0..n)
+            .map(|ans| {
+                if pokemons.is_valid_ans[ans] {
+                    (0..n).map(|guess| judge(&guess, &ans)).collect()
+                } else {
+                    vec![]
+                }
+            })
+            .collect();
 
         Self { data }
     }
 
     pub fn judge(&self, guess: &Guess, ans: &Answer) -> Judge {
         return self.data[*ans][*guess];
-    } 
+    }
 
     pub fn partition(&self, ans_rem: &Vec<Answer>, guess: &Guess) -> Partition {
         let mut ret: Partition = HashMap::new();
