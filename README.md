@@ -5,7 +5,7 @@ Minimize expectation.
 
 ## Demo
 
-https://habara-k.github.io/wordle-pokemon/
+https://habara-k.github.io/pokemon-wordle-solver/
 
 
 ## Solved
