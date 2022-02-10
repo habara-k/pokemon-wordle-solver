@@ -50,8 +50,8 @@ impl Node {
 
 #[derive(Default)]
 pub struct DecisionTree {
-    guess_seq: Vec<Vec<Guess>>,
-    judge_table: JudgeTable,
+    pub guess_seq: Vec<Vec<Guess>>,
+    pub judge_table: JudgeTable,
 }
 
 impl DecisionTree {
@@ -66,17 +66,31 @@ impl DecisionTree {
             })
             .collect();
 
-        let n = guess_seq.len();
+        let ans_until = guess_seq.len();
+        let guess_until = *guess_seq
+            .iter()
+            .map(|seq| seq.iter().max().unwrap_or(&0))
+            .max()
+            .unwrap()
+            + 1;
 
         Self {
             guess_seq,
-            judge_table: JudgeTable::new(n),
+            judge_table: JudgeTable::new(ans_until, guess_until),
         }
     }
 
     pub fn build(&self, rem_ans: &Vec<Answer>, depth: usize) -> Rc<Node> {
+        assert!(rem_ans.len() > 0);
+
         let guess = self.guess_seq[rem_ans[0]][depth];
         for i in 1..rem_ans.len() {
+            if self.guess_seq[rem_ans[i]].len() <= depth {
+                println!("{:?}", self.guess_seq[rem_ans[i]]);
+                println!("{:?}", rem_ans[i]);
+                println!("{:?}", POKEMONS[rem_ans[i]]);
+                println!("{:?}", depth);
+            }
             assert!(self.guess_seq[rem_ans[i]].len() > depth);
             assert!(guess == self.guess_seq[rem_ans[i]][depth]);
         }

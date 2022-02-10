@@ -6,10 +6,6 @@ use wordle_pokemon::{pokemon::*, tree::*};
 #[derive(FromArgs)]
 /// Build decision tree
 struct Args {
-    /// the number of pokemons
-    #[argh(option, short = 'n')]
-    num_pokemons: usize,
-
     /// the filepath of decision tree input
     #[argh(option, short = 'i')]
     input: String,
@@ -21,11 +17,10 @@ struct Args {
 
 fn main() {
     let args: Args = argh::from_env();
-    let n = args.num_pokemons;
 
-    let pokemons = PokemonList::new(n);
-
-    let root = DecisionTree::new(&args.input).build(&pokemons.all_ans, 0);
+    let tree = DecisionTree::new(&args.input);
+    let pokemons = PokemonList::new(tree.judge_table.ans_until, tree.judge_table.guess_until);
+    let root = tree.build(&pokemons.all_ans, 0);
 
     let mut f = fs::File::create(&args.output).unwrap();
     root.write(&mut f);

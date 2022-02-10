@@ -20,11 +20,13 @@ pub enum Status {
 
 #[derive(Default)]
 pub struct JudgeTable {
+    pub ans_until: usize,
+    pub guess_until: usize,
     data: Vec<Vec<Judge>>,
 }
 impl JudgeTable {
-    pub fn new(n: usize) -> Self {
-        let pokemons = PokemonList::new(n);
+    pub fn new(ans_until: usize, guess_until: usize) -> Self {
+        let pokemons = PokemonList::new(ans_until, guess_until);
 
         let judge = |guess: &Answer, ans: &Guess| -> Judge {
             assert!(pokemons.is_valid_guess[*guess]);
@@ -61,17 +63,21 @@ impl JudgeTable {
             ret
         };
 
-        let data = (0..n)
+        let data = (0..ans_until)
             .map(|ans| {
                 if pokemons.is_valid_ans[ans] {
-                    (0..n).map(|guess| judge(&guess, &ans)).collect()
+                    (0..guess_until).map(|guess| judge(&guess, &ans)).collect()
                 } else {
                     vec![]
                 }
             })
             .collect();
 
-        Self { data }
+        Self {
+            ans_until,
+            guess_until,
+            data,
+        }
     }
 
     pub fn judge(&self, guess: &Guess, ans: &Answer) -> Judge {

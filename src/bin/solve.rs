@@ -10,32 +10,6 @@ use std::time::Instant;
 
 use wordle_pokemon::{judge::*, pokemon::*};
 
-#[derive(FromArgs)]
-/// Minimize expectation of the number of guess
-struct Args {
-    /// the number of pokemons
-    #[argh(option, short = 'n')]
-    num_pokemons: usize,
-
-    /// the limit depth of lower_bound dfs
-    #[argh(option, default = "default_lb_depth_limit()")]
-    lb_depth_limit: usize,
-
-    /// the number of threads
-    #[argh(option, short = 't', default = "default_num_threads()")]
-    num_threads: usize,
-
-    /// the filepath of decision tree output
-    #[argh(option, short = 'o')]
-    output: String,
-}
-fn default_lb_depth_limit() -> usize {
-    1
-}
-fn default_num_threads() -> usize {
-    1
-}
-
 type SetId = usize;
 type Score = i32;
 
@@ -65,27 +39,24 @@ impl Cache {
 
 #[derive(Default)]
 struct Solver {
-    n: usize,
-    lb_depth_limit: usize,
+    ans_until: usize,
+    guess_until: usize,
 
     pokemons: PokemonList,
     judge_table: JudgeTable,
+
     cache: Arc<Mutex<Cache>>,
 }
 
 impl Solver {
-    pub fn new() -> Self {
-        let args: Args = argh::from_env();
-
-        let n = args.num_pokemons;
-        let lb_depth_limit = args.lb_depth_limit;
-
-        let pokemons = PokemonList::new(n);
-        let judge_table = JudgeTable::new(n);
+    const LB_DEPTH_LIMIT: usize = 1;
+    pub fn new(ans_until: usize, guess_until: usize) -> Self {
+        let pokemons = PokemonList::new(ans_until, guess_until);
+        let judge_table = JudgeTable::new(ans_until, guess_until);
 
         Self {
-            n,
-            lb_depth_limit,
+            ans_until,
+            guess_until,
             pokemons,
             judge_table,
             ..Default::default()
@@ -236,7 +207,7 @@ impl Solver {
             return *val;
         }
 
-        if self.lower_bound(rem_ans, self.lb_depth_limit) >= ub {
+        if self.lower_bound(rem_ans, Self::LB_DEPTH_LIMIT) >= ub {
             return INFTY;
         }
 
@@ -280,7 +251,7 @@ impl Solver {
             let lb: Score = rem_ans.len() as Score
                 + part
                     .values()
-                    .map(|s| self.lower_bound(s, self.lb_depth_limit))
+                    .map(|s| self.lower_bound(s, Self::LB_DEPTH_LIMIT))
                     .sum::<Score>();
 
             // ここを並列化すると遅くなる.
@@ -317,7 +288,7 @@ impl Solver {
     }
 
     pub fn write(&self, filepath: &str) {
-        let mut guess_seq: Vec<Vec<Guess>> = (0..self.n).map(|_| Vec::new()).collect();
+        let mut guess_seq: Vec<Vec<Guess>> = (0..self.ans_until).map(|_| Vec::new()).collect();
         self.dfs_build_guess_seq(&mut guess_seq, &self.pokemons.all_ans);
 
         let mut f = fs::File::create(filepath).unwrap();
@@ -365,12 +336,35 @@ impl Solver {
     }
 }
 
+#[derive(FromArgs)]
+/// Minimize expectation of the number of guess
+struct Args {
+    /// the number of answer pokemons
+    #[argh(option)]
+    ans_until: usize,
+
+    /// the number of guess pokemons
+    #[argh(option)]
+    guess_until: usize,
+
+    /// the number of threads
+    #[argh(option, short = 't', default = "default_num_threads()")]
+    num_threads: usize,
+
+    /// the filepath of decision tree output
+    #[argh(option, short = 'o')]
+    output: String,
+}
+fn default_num_threads() -> usize {
+    1
+}
+
 fn main() {
-    let solver = Solver::new();
+    let args: Args = argh::from_env();
+
+    let solver = Solver::new(args.ans_until, args.guess_until);
 
     //let guard = pprof::ProfilerGuard::new(100).unwrap();
-
-    let args: Args = argh::from_env();
 
     let pool = rayon::ThreadPoolBuilder::new()
         .num_threads(args.num_threads)

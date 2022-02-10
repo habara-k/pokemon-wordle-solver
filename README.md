@@ -11,10 +11,6 @@ https://habara-k.github.io/pokemon-wordle-solver/
 
 ## Solved
 
-| mode (pokemons with <=5, 5 words) | optimal expectation | worst case | computation time[s] |
-|-----------------------------------|---------------------|------------|---------------------|
-| until BW (644, 380)               | 3.5 (=1330/380)     | 6          | 578                 |
-| until XY (710, 425)               | 3.5576 (=1512/425)  | 6          | 2299                |
-| until SM (779, 474)               | 3.6139 (=1713/474)  | 7          | 9474                |
-
-excluding `ニドラン♂, ニドラン♀, ポリゴン2, ポリゴンZ`.
+| mode     | optimal expectation | worst case | computation time[s] |
+|----------|--------------------:|-----------:|--------------------:|
+| until DP | 3.3404 (= 942/282)  | 6          | 95                  |
