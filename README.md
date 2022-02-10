@@ -1,4 +1,4 @@
-# Wordle Pokemon
+# Pokemon Wordle Solver
 
 
 Minimize expectation.
