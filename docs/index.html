@@ -6,11 +6,11 @@
   </head>
   <body>
     <h1><a href="https://github.com/habara-k/wordle-pokemon">Pokemon Wordle Solver</a></h1>
-    <!-- <p>Only supports until DP mode (3.3404 times on average, 6 times at worst).</p> -->
     <label for="mode">Select mode: until </label>
     <select id="mode" onchange="restart()">
       <option selected="selected">DP</option>
       <option>BW</option>
+      <option>XY</option>
     </select>
     <br>
     <textarea id="output" type="textarea" rows="10" cols="50" disabled></textarea>

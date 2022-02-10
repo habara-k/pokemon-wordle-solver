@@ -22,7 +22,7 @@ function on_enter(e) {
     output.value += input.value + "\n";
 
     if ("guess" in json_obj) {
-      output.value += json_obj.guess + "\n-> ";
+      output.value += json_obj.guess + " (" + json_obj.rem + ")\n-> ";
     } else {
       output.value += "Congratulations!!!\n";
       output.value += "If you want to play again, please restart.";
@@ -36,7 +36,7 @@ function restart() {
   output.value = "";
   input.value = "";
   json_obj = JSON.parse(tree_json[mode.value]);
-  output.value += json_obj.guess + "\n-> ";
+  output.value += json_obj.guess + " (" + json_obj.rem + ")\n-> ";
 }
 
 window.onload = function() {
