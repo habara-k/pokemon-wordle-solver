@@ -22,33 +22,21 @@ fn main() {
 
     let pokemons = PokemonList::new(n);
 
-    let root = DecisionTree::new(&args.input).build(&pokemons.all_ans, 0);
+    let mut node = DecisionTree::new(&args.input).build(&pokemons.all_ans, 0);
 
-    let mut history = vec![];
-
-    loop {
-        let nxt = DecisionTree::next(&root, &history);
-        println!("(残り{}匹) {}", nxt.rem_ans.len(), POKEMONS[nxt.guess]);
+    while let Node::NonTerminal{ guess, rem_ans, .. } = &*node {
+        println!("(残り{}匹) {}", rem_ans.len(), POKEMONS[*guess]);
 
         print!("-> ");
         std::io::stdout().flush().unwrap();
         let mut s = String::new();
         std::io::stdin().read_line(&mut s).unwrap();
         let s = s.trim().to_string();
-        if s.len() != 5 {
-            println!("s.len(): {}", s.len());
-        }
 
-        assert!(s.len() == 5);
-        history.push({
-            let judge = s.chars().enumerate().map(|(i, c)| {
+        node = node.next(&(
+            s.chars().enumerate().map(|(i, c)| {
                 c.to_digit(10).unwrap() << 2*i
-            }).sum::<u32>() as Judge;
-            if judge == ALL_CORRECT {
-                println!("Congratulations!!!");
-                break;
-            }
-            judge
-        });
+            }).sum::<u32>() as Judge)
+        );
     }
 }
