@@ -18,5 +18,3 @@ https://habara-k.github.io/pokemon-wordle-solver/
 | until XY(425)  | 3.5576 (= 1512/425) | 6          | 3497                |
 | until SM(474)  | 3.6139 (= 1713/474) | 6          | 11488               |
 | until SWSH(511)| 3.6379 (= 1859/511) | 6          | 24891               |
-
-excluding `ニドラン♂, ニドラン♀, ポリゴン2, ポリゴンZ`.
