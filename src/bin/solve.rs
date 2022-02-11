@@ -41,7 +41,6 @@ impl Cache {
 struct Solver {
     ans_until: usize,
     //guess_until: usize,
-
     pokemons: PokemonList,
     judge_table: JudgeTable,
 
@@ -247,16 +246,16 @@ impl Solver {
             let guess = &all_guess[i];
             let part = &partitions[i];
 
-            let lb: Score = rem_ans.len() as Score
+            let lb = rem_ans.len() as Score
                 + part
                     .values()
                     .map(|s| self.lower_bound(s, Self::LB_DEPTH_LIMIT))
                     .sum::<Score>();
 
-            // ここを並列化すると遅くなる.
+            // // ここを並列化すると遅くなる.
             // // parallel
             // let lb: Score = rem_ans.len() as Score + part.par_iter().map(|(_, s)| {
-            //     self.lower_bound(s, self.lb_depth_limit)
+            //     self.lower_bound(s, Self::LB_DEPTH_LIMIT)
             // }).sum::<Score>();
 
             if lb >= val {

@@ -17,12 +17,18 @@ pub enum Node {
 impl Node {
     pub fn write(&self, out: &mut fs::File) {
         match self {
-            Node::NonTerminal { guess, edges, rem_ans } => {
+            Node::NonTerminal {
+                guess,
+                edges,
+                rem_ans,
+            } => {
                 out.write_all(
-                    format!("{{\"guess\":\"{}\",\"rem\":{},\"edges\":{{",
-                    POKEMONS[*guess],
-                    rem_ans.len(),
-                    ).as_bytes()
+                    format!(
+                        "{{\"guess\":\"{}\",\"rem\":{},\"edges\":{{",
+                        POKEMONS[*guess],
+                        rem_ans.len(),
+                    )
+                    .as_bytes(),
                 )
                 .unwrap();
                 for (i, (judge, ch)) in edges.iter().enumerate() {
