@@ -96,8 +96,7 @@ impl Solver {
             // 従って残りの3つの候補から宣言する場合だけ考えれば良い.
             rem_ans
         } else {
-            // おそらく5文字の宣言が最適
-            &self.pokemons.all_ans
+            &self.pokemons.all_guess
         };
 
         let good_guess = all_guess
